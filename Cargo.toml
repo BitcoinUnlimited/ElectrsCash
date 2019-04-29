@@ -16,7 +16,6 @@ build = "build.rs"
 latest_rust = []  # use latest Rust features (otherwise, support Rust 1.32)
 
 [dependencies]
-arrayref = "0.3"
 base64 = "0.10"
 bincode = "1.0"
 bitcoin = { version = "0.18", features = ["use-serde"] }

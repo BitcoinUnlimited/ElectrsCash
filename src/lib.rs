@@ -1,7 +1,7 @@
 #![recursion_limit = "1024"]
 
 #[macro_use]
-extern crate arrayref;
+extern crate clap;
 #[macro_use]
 extern crate error_chain;
 #[macro_use]
