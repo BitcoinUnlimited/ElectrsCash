@@ -45,3 +45,6 @@ stderrlog = "0.4.1"
 sysconf = ">=0.3.4"
 time = "0.1"
 tiny_http = "0.6"
+cashaccount-sys = { git = "https://github.com/dagurval/cashaccount-sys.git" }
+scopeguard = "1.0"
+c_fixed_string = "0.2"

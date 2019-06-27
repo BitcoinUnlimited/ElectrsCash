@@ -29,3 +29,11 @@ In order to save storage space, we store the full transaction IDs once, and use 
 
 Note that this mapping allows us to use `getrawtransaction` RPC to retrieve actual transaction data from without `-txindex` enabled
 (by explicitly specifying the [blockhash](https://github.com/bitcoin/bitcoin/commit/497d0e014cc79d46531d570e74e4aeae72db602d)).
+
+## CashAccount index
+
+Allows finding all transactions containing CashAccount registration by name and block height.
+
+|  Code  | Account name              | Registration TxID Prefix
+| ------ | ------------------------- | -------------------------- | - |
+| `b'C'` | `SHA256(name#height)[:8]` | `txid[:8]`                 |   |

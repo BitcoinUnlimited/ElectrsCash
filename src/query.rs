@@ -1,5 +1,5 @@
 use bitcoin::blockdata::transaction::Transaction;
-use bitcoin::consensus::encode::deserialize;
+use bitcoin::consensus::encode::{deserialize, serialize};
 use bitcoin_hashes::hex::ToHex;
 use bitcoin_hashes::sha256d::Hash as Sha256dHash;
 use bitcoin_hashes::Hash;
@@ -11,6 +11,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex, RwLock};
 
 use crate::app::App;
+use crate::cashaccount::{has_cashaccount, txids_by_cashaccount};
 use crate::errors::*;
 use crate::index::{compute_script_hash, TxInRow, TxOutRow, TxRow};
 use crate::mempool::Tracker;
@@ -505,5 +506,41 @@ impl Query {
 
     pub fn get_banner(&self) -> Result<String> {
         self.app.get_banner()
+    }
+
+    pub fn get_cashaccount_txs(&self, name: &str, height: usize) -> Result<Value> {
+        let cashaccount_txns: Vec<TxnHeight> = self.load_txns_by_prefix(
+            self.app.read_store(),
+            txids_by_cashaccount(self.app.read_store(), name, height),
+        )?;
+
+        // filter on name in case of txid prefix collision
+        let cashaccount_txns = cashaccount_txns
+            .iter()
+            .filter(|txn| has_cashaccount(&txn.txn, name));
+
+        #[derive(Serialize, Deserialize, Debug)]
+        struct AccountTx {
+            tx: String,
+            height: u32,
+            blockhash: String,
+        };
+
+        let header = self
+            .app
+            .index()
+            .get_header(height as usize)
+            .chain_err(|| format!("missing header at height {}", height))?;
+        let blockhash = *header.hash();
+
+        let cashaccount_txns: Vec<AccountTx> = cashaccount_txns
+            .map(|txn| AccountTx {
+                tx: hex::encode(&serialize(&txn.txn)),
+                height: txn.height,
+                blockhash: blockhash.to_hex(),
+            })
+            .collect();
+
+        Ok(json!(cashaccount_txns))
     }
 }
