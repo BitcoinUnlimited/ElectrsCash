@@ -1,3 +1,7 @@
+# Next release
+
+* Revert LTO build (to fix deterministic build)
+
 # 0.7.0 (13 June 2019)
 
 * Support Bitcoin Core 0.18
