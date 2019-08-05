@@ -11,9 +11,6 @@ documentation = "https://docs.rs/electrs/"
 readme = "README.md"
 edition = "2018"
 
-[profile.release]
-lto = true
-
 [features]
 latest_rust = []  # use latest Rust features (otherwise, support Rust 1.32)
 
