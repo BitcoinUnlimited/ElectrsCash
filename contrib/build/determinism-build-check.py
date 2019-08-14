@@ -13,6 +13,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from utilbuild import cargo_run
 
 FAKETIME_TIMESTAMP = '12am'
 
@@ -55,44 +56,6 @@ def hash_artifacts(target_dir, file_patterns):
         hashed[key] = file_digest(f)
     return hashed
 
-def output_reader(pipe, queue):
-    try:
-        with pipe:
-            for l in iter(pipe.readline, b''):
-                queue.put(l)
-    finally:
-        queue.put(None)
-
-def cargo_run(args):
-    import subprocess
-    from threading import Thread
-    from queue import Queue
-
-    faketime = shutil.which("faketime")
-    if faketime is None:
-        logging.error("Please install faketime")
-        raise Exception("faketime not found")
-
-    cargo = shutil.which("cargo")
-    args = [faketime, "-m", FAKETIME_TIMESTAMP] + [cargo] + args
-    logging.info("Running %s", " ".join(args))
-    assert cargo is not None
-
-    p = subprocess.Popen(args,
-        stdout = subprocess.PIPE, stderr = subprocess.PIPE)
-
-    q = Queue()
-    Thread(target = output_reader, args = [p.stdout, q]).start()
-    Thread(target = output_reader, args = [p.stderr, q]).start()
-
-    for line in iter(q.get, None):
-        logging.debug(line.decode('utf-8').rstrip())
-
-    p.wait()
-    rc = p.returncode
-    assert rc is not None
-    if rc != 0:
-        raise Exception("cargo failed with return code %s" % rc)
 
 
 def rmdir(path):
@@ -162,9 +125,9 @@ def build(build1_dir, build2_dir):
         rmdir(os.path.join(home, ".cargo", ".registry"))
 
     clear_cache()
-    cargo_run(["build", "--release", "--target=x86_64-unknown-linux-gnu", "--target-dir=" + build1_dir])
+    cargo_run(["build", "--release", "--target=x86_64-unknown-linux-gnu", "--target-dir=" + build1_dir], logging, faketime = FAKETIME_TIMESTAMP)
     clear_cache()
-    cargo_run(["build", "--release", "--target=x86_64-unknown-linux-gnu", "--target-dir=" + build2_dir])
+    cargo_run(["build", "--release", "--target=x86_64-unknown-linux-gnu", "--target-dir=" + build2_dir], logging, faketime = FAKETIME_TIMESTAMP)
 
 def check_artifacts(build1_dir, build2_dir):
     a1 = hash_artifacts(build1_dir, ["*.rlib", "*.a", "*.so"])
