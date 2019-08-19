@@ -285,6 +285,14 @@ impl Connection {
             "merkle" : merkle_vec}))
     }
 
+    fn cashaccount_query_name(&self, params: &[Value]) -> Result<Value> {
+        let name = params.get(0).chain_err(|| "missing name")?;
+        let name = name.as_str().chain_err(|| "bad accountname")?;
+        let height = usize_from_value(params.get(1), "height")?;
+
+        self.query.get_cashaccount_txs(name, height)
+    }
+
     fn handle_command(&mut self, method: &str, params: &[Value], id: &Value) -> Result<Value> {
         let timer = self
             .stats
@@ -313,6 +321,7 @@ impl Connection {
             "server.peers.subscribe" => self.server_peers_subscribe(),
             "server.ping" => Ok(Value::Null),
             "server.version" => self.server_version(),
+            "cashaccount.query.name" => self.cashaccount_query_name(&params),
             &_ => bail!("unknown method {} {:?}", method, params),
         };
         timer.observe_duration();

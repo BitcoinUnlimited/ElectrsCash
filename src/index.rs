@@ -10,6 +10,7 @@ use std::collections::{HashMap, HashSet};
 use std::iter::FromIterator;
 use std::sync::RwLock;
 
+use crate::cashaccount::index_cashaccount;
 use crate::daemon::Daemon;
 use crate::errors::*;
 use crate::metrics::{
@@ -177,6 +178,8 @@ pub fn index_transaction<'a>(
     let null_hash = Sha256dHash::default();
     let txid: Sha256dHash = txn.txid();
 
+    let cashaccount = index_cashaccount(txn, height);
+
     let inputs = txn.input.iter().filter_map(move |input| {
         if input.previous_output.txid == null_hash {
             None
@@ -193,6 +196,7 @@ pub fn index_transaction<'a>(
     inputs
         .chain(outputs)
         .chain(std::iter::once(TxRow::new(&txid, height as u32).to_row()))
+        .chain(cashaccount)
 }
 
 pub fn index_block<'a>(block: &'a Block, height: usize) -> impl 'a + Iterator<Item = Row> {
