@@ -1,0 +1,17 @@
+{
+  "name": "bench-xpub",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "bitbox-sdk": "^8.7.0",
+    "cli-progress": "^3.0.0",
+    "durations": "^3.4.1",
+    "electrum-client": "0.0.6"
+  }
+}
