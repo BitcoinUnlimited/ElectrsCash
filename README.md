@@ -1,7 +1,7 @@
 # ElectrsCash - Electrum Server in Rust
 
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat-square)](http://makeapullrequest.com)
-[![Build Status](https://travis-ci.com/BitcoinUnlimited/ElectrsCash.svg?branch=master)](https://travis-ci.com/BitcoinUnlimited/ElectrsCash)
+[![Build Status](https://travis-ci.org/BitcoinUnlimited/ElectrsCash.svg?branch=master)](https://travis-ci.org/BitcoinUnlimited/ElectrsCash)
 
 An efficient implementation of Electrum Server, patch set on top of
 [electrs](https://github.com/romanz/electrs).
