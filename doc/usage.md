@@ -1,8 +1,15 @@
-## Installation
+## Pre-built binaries
 
-Install [latest Rust](https://rustup.rs/) (1.32+),
-[latest Bitcoin Core](https://bitcoincore.org/en/download/) (0.16+)
-and [latest Electrum wallet](https://electrum.org/#download) (3.3+).
+Pre-built binaries exist for 64-bit GNU/Linux.
+
+Stable versions are bundled with [Bitcoin Unlimited releases](https://www.bitcoinunlimited.info/download). These are deterministically built and signed by multiple individuals.
+
+Testing versions are [available here](https://bitcoincash.network:8001/). These are unsigned. Testing versions are automatically built every time there is a code update. The naming convention is `electrscash-<date of build>-<git commit hash>.tar.gz`.
+
+
+## Building binaries
+
+Install [latest Rust](https://rustup.rs/) (1.32+)
 
 Also, install the following packages (on Debian):
 ```bash
@@ -10,25 +17,25 @@ $ sudo apt update
 $ sudo apt install clang cmake  # for building 'rust-rocksdb'
 ```
 
-## Build
-
 First build should take ~20 minutes:
 ```bash
-$ git clone https://github.com/romanz/electrs
-$ cd electrs
+$ git clone https://github.com/BitcoinUnlimited/ElectrsCash.git
+$ cd ElectrsCash
 $ cargo build --release
 ```
 
-
 ## Bitcoind configuration
 
-Allow Bitcoin daemon to sync before starting Electrum server:
-```bash
-$ bitcoind -server=1 -txindex=0 -prune=0
-```
+### Bitcoin Unlimited
+
+ElectrsCash is automatically configured and started with Bitcoin Unlimited. If the binary is not in the same directory as `bitcoind`, you can specify the alternative location using `-electrum.exec=/full/path/ElectrsCash`.
+
+For more options, see `bitcoind -help`.
+
+### Other nodes
 
 If you are using `-rpcuser=USER` and `-rpcpassword=PASSWORD` for authentication, please use `--cookie="USER:PASSWORD"` command-line flag.
-Otherwise, [`~/.bitcoin/.cookie`](https://github.com/bitcoin/bitcoin/blob/0212187fc624ea4a02fc99bc57ebd413499a9ee1/contrib/debian/examples/bitcoin.conf#L70-L72) will be read, allowing this server to use bitcoind JSONRPC interface.
+Otherwise, `~/.bitcoin/.cookie` will be read, allowing this server to use bitcoind JSONRPC interface.
 
 ## Usage
 
@@ -72,23 +79,9 @@ $ du db/
 
 ## Electrum client
 ```bash
-# Connect only to the local server, for better privacy
-$ ./scripts/local-electrum.bash
-+ ADDR=127.0.0.1
-+ PORT=50001
-+ PROTOCOL=t
-+ electrum --oneserver --server=127.0.0.1:50001:t
-<snip>
+# Connecting to your local server
+$ electron-cash --oneserver --server=127.0.0.1:50001:t
 ```
-
-You can persist Electrum configuration (see `~/.electrum/config`) using:
-```bash
-$ electrum setconfig oneserver true
-$ electrum setconfig server 127.0.0.1:50001:t
-$ electrum   # will connect only to the local server
-```
-
-
 ### SSL connection
 
 In order to use a secure connection, you can also use [NGINX as an SSL endpoint](https://docs.nginx.com/nginx/admin-guide/security-controls/terminating-ssl-tcp/#) by placing the following block in `nginx.conf`.
