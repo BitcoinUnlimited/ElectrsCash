@@ -23,7 +23,7 @@ def main():
     if args.server:
         addr = args.server
 
-    conn = client.Connection((addr, port))
+    conn = client.Client((addr, port))
     print(conn.call('cashaccount.query.name', args.name[0], int(args.height[0])))
 
 

@@ -1,6 +1,8 @@
-# Next release
+# 0.7.1 (TBD)
 
 * Revert LTO build (to fix deterministic build)
+* Allow stopping bulk indexing via SIGINT/SIGTERM
+* Cache list of transaction IDs for blocks
 
 # 0.7.0 (13 June 2019)
 
