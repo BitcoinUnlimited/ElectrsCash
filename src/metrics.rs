@@ -128,18 +128,18 @@ fn parse_stats() -> Result<Stats> {
 
 fn start_process_exporter(metrics: &Metrics) {
     let rss = metrics.gauge(MetricOpts::new(
-        "electrs_process_memory_rss",
+        "electrscash_process_memory_rss",
         "Resident memory size [bytes]",
     ));
     let cpu = metrics.gauge_vec(
         MetricOpts::new(
-            "electrs_process_cpu_usage",
+            "electrscash_process_cpu_usage",
             "CPU usage by this process [seconds]",
         ),
         &["type"],
     );
     let fds = metrics.gauge(MetricOpts::new(
-        "electrs_process_open_fds",
+        "electrscash_process_open_fds",
         "# of file descriptors",
     ));
     spawn_thread("exporter", move || loop {

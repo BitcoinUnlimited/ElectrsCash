@@ -15,11 +15,11 @@ impl BlockTxIDsCache {
         BlockTxIDsCache {
             map: Mutex::new(LruCache::new(capacity)),
             hits: metrics.counter(MetricOpts::new(
-                "electrs_blocktxids_cache_hits",
+                "electrscash_blocktxids_cache_hits",
                 "# of cache hits for list of transactions in a block",
             )),
             misses: metrics.counter(MetricOpts::new(
-                "electrs_blocktxids_cache_misses",
+                "electrscash_blocktxids_cache_misses",
                 "# of cache misses for list of transactions in a block",
             )),
         }

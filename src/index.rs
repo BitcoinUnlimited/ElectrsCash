@@ -290,23 +290,26 @@ impl Stats {
     fn new(metrics: &Metrics) -> Stats {
         Stats {
             blocks: metrics.counter(MetricOpts::new(
-                "electrs_index_blocks",
+                "electrscash_index_blocks",
                 "# of indexed blocks",
             )),
             txns: metrics.counter(MetricOpts::new(
-                "electrs_index_txns",
+                "electrscash_index_txns",
                 "# of indexed transactions",
             )),
             vsize: metrics.counter(MetricOpts::new(
-                "electrs_index_vsize",
+                "electrscash_index_vsize",
                 "# of indexed vbytes",
             )),
             height: metrics.gauge(MetricOpts::new(
-                "electrs_index_height",
+                "electrscash_index_height",
                 "Last indexed block's height",
             )),
             duration: metrics.histogram_vec(
-                HistogramOpts::new("electrs_index_duration", "indexing duration (in seconds)"),
+                HistogramOpts::new(
+                    "electrscash_index_duration",
+                    "indexing duration (in seconds)",
+                ),
                 &["step"],
             ),
         }
