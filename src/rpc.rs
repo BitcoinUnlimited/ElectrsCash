@@ -17,7 +17,7 @@ use crate::metrics::{Gauge, HistogramOpts, HistogramVec, MetricOpts, Metrics};
 use crate::query::{Query, Status};
 use crate::util::{spawn_thread, Channel, HeaderEntry, SyncChannel};
 
-const ELECTRS_VERSION: &str = env!("CARGO_PKG_VERSION");
+const ELECTRSCASH_VERSION: &str = env!("CARGO_PKG_VERSION");
 const PROTOCOL_VERSION: &str = "1.4";
 
 // TODO: Sha256dHash should be a generic hash-container (since script hash is single SHA256)
@@ -107,7 +107,7 @@ impl Connection {
 
     fn server_version(&self) -> Result<Value> {
         Ok(json!([
-            format!("electrs {}", ELECTRS_VERSION),
+            format!("ElectrsCash {}", ELECTRSCASH_VERSION),
             PROTOCOL_VERSION
         ]))
     }

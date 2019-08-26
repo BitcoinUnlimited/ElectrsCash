@@ -45,7 +45,7 @@ fn str_to_socketaddr(address: &str, what: &str) -> SocketAddr {
 impl Config {
     pub fn from_args() -> Config {
         let default_banner = format!(
-            "Welcome to electrs {} (Electrum Rust Server)!",
+            "Welcome to ElectrsCash {} (Electrum Rust Server)!",
             env!("CARGO_PKG_VERSION")
         );
         let m = App::new("Electrum Rust Server")

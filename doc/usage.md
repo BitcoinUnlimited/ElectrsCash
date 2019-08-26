@@ -66,7 +66,7 @@ $ cargo run --release -- -vvv --timestamp --db-dir ./db --electrum-rpc-addr="127
 ```
 Note that the final DB size should be ~20% of the `blk*.dat` files, but it may increase to ~35% at the end of the inital sync (just before the [full compaction is invoked](https://github.com/facebook/rocksdb/wiki/Manual-Compaction)).
 
-If initial sync fails due to `memory allocation of xxxxxxxx bytes failedAborted` errors, as may happen on devices with limited RAM, try the following arguments when starting `electrs`. It should take roughly 18 hours to sync and compact the index on an ODROID-HC1 with 8 CPU cores @ 2GHz, 2GB RAM, and an SSD using the following command:
+If initial sync fails due to `memory allocation of xxxxxxxx bytes failedAborted` errors, as may happen on devices with limited RAM, try the following arguments when starting `electrscash`. It should take roughly 18 hours to sync and compact the index on an ODROID-HC1 with 8 CPU cores @ 2GHz, 2GB RAM, and an SSD using the following command:
 
 ```bash
 $ cargo run --release -- -vvvv --index-batch-size=10 --jsonrpc-import --db-dir ./db --electrum-rpc-addr="127.0.0.1:50001" [--cookie="USER:PASSWORD"]
@@ -89,13 +89,13 @@ In order to use a secure connection, you can also use [NGINX as an SSL endpoint]
 
 ```nginx
 stream {
-        upstream electrs {
+        upstream electrscash {
                 server 127.0.0.1:50001;
         }
 
         server {
                 listen 50002 ssl;
-                proxy_pass electrs;
+                proxy_pass electrscash;
 
                 ssl_certificate /path/to/example.crt;
                 ssl_certificate_key /path/to/example.key;
@@ -112,7 +112,7 @@ $ sudo systemctl restart nginx
 $ electrum --oneserver --server=example:50002:s
 ```
 
-Note: If you are connecting to electrs from Eclair Mobile or another similar client which does not allow self-signed SSL certificates, you can obtain a free SSL certificate as follows:
+Note: If you are connecting to electrscash from Eclair Mobile or another similar client which does not allow self-signed SSL certificates, you can obtain a free SSL certificate as follows:
 
 1. Follow the instructions at https://certbot.eff.org/ to install the certbot on your system.
 2. When certbot obtains the SSL certificates for you, change the SSL paths in the nginx template above as follows:
@@ -156,16 +156,16 @@ For more details, see http://docs.electrum.org/en/latest/tor.html.
 
 ### Sample Systemd Unit File
 
-You may wish to have systemd manage electrs so that it's "always on." Here is a sample unit file (which assumes that the bitcoind unit file is `bitcoind.service`):
+You may wish to have systemd manage electrscash so that it's "always on." Here is a sample unit file (which assumes that the bitcoind unit file is `bitcoind.service`):
 
 ```
 [Unit]
-Description=Electrs
+Description=ElectrsCash
 After=bitcoind.service
 
 [Service]
-WorkingDirectory=/home/bitcoin/electrs
-ExecStart=/home/bitcoin/electrs/target/release/electrs --db-dir ./db --electrum-rpc-addr="127.0.0.1:50001"
+WorkingDirectory=/home/bitcoin/electrscash
+ExecStart=/home/bitcoin/electrscash/target/release/electrscash --db-dir ./db --electrum-rpc-addr="127.0.0.1:50001"
 User=bitcoin
 Group=bitcoin
 Type=simple
@@ -179,12 +179,12 @@ WantedBy=multi-user.target
 ```
 ## Docker
 ```bash
-$ docker build -t electrs-app .
+$ docker build -t electrscash-app .
 $ docker run --network host \
              --volume $HOME/.bitcoin:/home/user/.bitcoin:ro \
              --volume $PWD:/home/user \
-             --rm -i -t electrs-app \
-             electrs -vvvv --timestamp --db-dir /home/user/db
+             --rm -i -t electrscash-app \
+             electrscash -vvvv --timestamp --db-dir /home/user/db
 ```
 
 ## Monitoring
@@ -195,7 +195,7 @@ Indexing and serving metrics are exported via [Prometheus](https://github.com/pi
 $ sudo apt install prometheus
 $ echo "
 scrape_configs:
-  - job_name: electrs
+  - job_name: electrscash
     static_configs:
     - targets: ['localhost:4224']
 " | sudo tee -a /etc/prometheus/prometheus.yml

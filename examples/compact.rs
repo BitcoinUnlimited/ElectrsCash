@@ -1,12 +1,12 @@
 /// Benchmark full compaction.
-extern crate electrs;
+extern crate electrscash;
 
 #[macro_use]
 extern crate log;
 
 extern crate error_chain;
 
-use electrs::{config::Config, errors::*, store::DBStore};
+use electrscash::{config::Config, errors::*, store::DBStore};
 
 use error_chain::ChainedError;
 
