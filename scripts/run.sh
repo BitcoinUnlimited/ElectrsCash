@@ -3,7 +3,7 @@ set -eu
 trap 'kill $(jobs -p)' EXIT
 
 DELAY=5
-LOG=/tmp/electrs.log
+LOG=/tmp/electrscash.log
 CARGO="cargo +stable"
 
 tail -v -n0 -F "$LOG" &

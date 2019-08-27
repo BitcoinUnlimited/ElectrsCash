@@ -1,4 +1,4 @@
-extern crate electrs;
+extern crate electrscash;
 
 extern crate error_chain;
 #[macro_use]
@@ -9,7 +9,7 @@ use std::process;
 use std::sync::Arc;
 use std::time::Duration;
 
-use electrs::{
+use electrscash::{
     app::App,
     bulk,
     cache::BlockTxIDsCache,

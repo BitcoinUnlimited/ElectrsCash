@@ -1,13 +1,13 @@
 [package]
-name = "electrs"
+name = "electrscash"
 version = "0.7.1"
-authors = ["Roman Zeyde <me@romanzey.de>"]
-description = "An efficient re-implementation of Electrum Server in Rust"
+authors = ["Roman Zeyde <me@romanzey.de>", "Bitcoin Unlimited developers <info@bitcoinunlimited.info"]
+description = "An efficient implementation of Electrum Server"
 license = "MIT"
-homepage = "https://github.com/romanz/electrs"
-repository = "https://github.com/romanz/electrs"
-keywords = ["bitcoin", "electrum", "server", "index", "database"]
-documentation = "https://docs.rs/electrs/"
+homepage = "https://github.com/BitcoinUnlimited/ElectrsCash"
+repository = "https://github.com/BitcoinUnlimited/ElectrsCash"
+keywords = ["bitcoin", "cash", "electrum", "server", "index"]
+documentation = "https://docs.rs/electrscash/"
 readme = "README.md"
 edition = "2018"
 

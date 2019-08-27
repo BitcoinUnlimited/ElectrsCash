@@ -153,19 +153,19 @@ impl Tracker {
             histogram: vec![],
             stats: Stats {
                 count: metrics.gauge(MetricOpts::new(
-                    "electrs_mempool_count",
+                    "electrscash_mempool_count",
                     "# of mempool transactions",
                 )),
                 update: metrics.histogram_vec(
                     HistogramOpts::new(
-                        "electrs_mempool_update",
+                        "electrscash_mempool_update",
                         "Time to update mempool (in seconds)",
                     ),
                     &["step"],
                 ),
                 vsize: metrics.gauge_vec(
                     MetricOpts::new(
-                        "electrs_mempool_vsize",
+                        "electrscash_mempool_vsize",
                         "Total vsize of transactions paying at most given fee rate",
                     ),
                     &["fee_rate"],

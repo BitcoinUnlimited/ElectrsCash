@@ -17,7 +17,7 @@ import tempfile
 FAKETIME_TIMESTAMP = '12am'
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--skip-build', help='Skip (re)building electrs',
+parser.add_argument('--skip-build', help='Skip (re)building electrscash',
         action = "store_true")
 parser.add_argument('--verbose', help='Sets log level to DEBUG',
         action = "store_true")
@@ -199,27 +199,27 @@ def check_artifacts(build1_dir, build2_dir):
 
     return ok
 
-def check_electrs_bin(build1_dir, build2_dir):
-    a1 = hash_artifacts(build1_dir, ["electrs"])
-    a2 = hash_artifacts(build2_dir, ["electrs"])
+def check_electrscash_bin(build1_dir, build2_dir):
+    a1 = hash_artifacts(build1_dir, ["electrscash"])
+    a2 = hash_artifacts(build2_dir, ["electrscash"])
     assert(len(a1) == 1)
     assert(len(a2) == 1)
-    electrs_bin = list(a1.keys())[0]
+    electrscash_bin = list(a1.keys())[0]
 
-    ok = a1[electrs_bin] == a2[electrs_bin]
+    ok = a1[electrscash_bin] == a2[electrscash_bin]
     if ok:
-        logging.debug("%s OK!" % electrs_bin)
+        logging.debug("%s OK!" % electrscash_bin)
     else:
-        logging.error("%s does not match" % electrs_bin)
-        logging.error("\t%s: %s" % (build1_dir, a1[electrs_bin]))
-        logging.error("\t%s: %s" % (build2_dir, a1[electrs_bin]))
+        logging.error("%s does not match" % electrscash_bin)
+        logging.error("\t%s: %s" % (build1_dir, a1[electrscash_bin]))
+        logging.error("\t%s: %s" % (build2_dir, a1[electrscash_bin]))
     return ok
 
 if not args.skip_build:
     build(args.build1_dir, args.build2_dir)
 
 ok = check_artifacts(args.build1_dir, args.build2_dir)
-ok = ok and check_electrs_bin(args.build1_dir, args.build2_dir)
+ok = ok and check_electrscash_bin(args.build1_dir, args.build2_dir)
 
 if ok:
     logging.info("SUCCESS - builds are deterministic!")

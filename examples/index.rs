@@ -1,11 +1,11 @@
 /// Benchmark regular indexing flow (using JSONRPC), don't persist the resulting index.
-extern crate electrs;
+extern crate electrscash;
 extern crate error_chain;
 
 #[macro_use]
 extern crate log;
 
-use electrs::{
+use electrscash::{
     cache::BlockTxIDsCache, config::Config, daemon::Daemon, errors::*, fake::FakeStore,
     index::Index, metrics::Metrics, signal::Waiter,
 };

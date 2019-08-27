@@ -43,18 +43,21 @@ impl Parser {
             indexed_blockhashes: Mutex::new(indexed_blockhashes),
             duration: metrics.histogram_vec(
                 HistogramOpts::new(
-                    "electrs_parse_duration",
+                    "electrscash_parse_duration",
                     "blk*.dat parsing duration (in seconds)",
                 ),
                 &["step"],
             ),
             block_count: metrics.counter_vec(
-                MetricOpts::new("electrs_parse_blocks", "# of block parsed (from blk*.dat)"),
+                MetricOpts::new(
+                    "electrscash_parse_blocks",
+                    "# of block parsed (from blk*.dat)",
+                ),
                 &["type"],
             ),
 
             bytes_read: metrics.histogram(HistogramOpts::new(
-                "electrs_parse_bytes_read",
+                "electrscash_parse_bytes_read",
                 "# of bytes read (from blk*.dat)",
             )),
         }))
