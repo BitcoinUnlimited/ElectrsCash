@@ -15,8 +15,6 @@ import sys
 import tempfile
 from utilbuild import cargo_run
 
-FAKETIME_TIMESTAMP = '12am'
-
 parser = argparse.ArgumentParser()
 parser.add_argument('--skip-build', help='Skip (re)building electrscash',
         action = "store_true")
@@ -26,6 +24,9 @@ parser.add_argument('--build1-dir', default="/tmp/ec-build1",
     help="Directory of #1 build (warning: gets deleted if it exists)")
 parser.add_argument('--build2-dir', default="/tmp/ec-build2",
     help="Directory of #2 build (warning: gets deleted if it exists)")
+parser.add_argument('--enable-faketime',
+    help='Enable faktime (broken with rustc >= 1.32.0)',
+     action = 'store_true')
 args = parser.parse_args()
 
 level = logging.DEBUG if args.verbose else logging.INFO
@@ -113,7 +114,7 @@ def check_obj_files(lib, build1_dir, build2_dir):
 
     return ok, lib1_dir, lib2_dir
 
-def build(build1_dir, build2_dir):
+def build(build1_dir, build2_dir, enable_faketime):
     rmdir(build1_dir)
     rmdir(build2_dir)
 
@@ -124,10 +125,13 @@ def build(build1_dir, build2_dir):
         rmdir(os.path.join(home, ".cargo", ".git"))
         rmdir(os.path.join(home, ".cargo", ".registry"))
 
+    faketime = None
+    if enable_faketime:
+        faketime = '12am'
     clear_cache()
-    cargo_run(["build", "--release", "--target=x86_64-unknown-linux-gnu", "--target-dir=" + build1_dir], logging, faketime = FAKETIME_TIMESTAMP)
+    cargo_run(["build", "--release", "--target=x86_64-unknown-linux-gnu", "--target-dir=" + build1_dir], logging, faketime = faketime)
     clear_cache()
-    cargo_run(["build", "--release", "--target=x86_64-unknown-linux-gnu", "--target-dir=" + build2_dir], logging, faketime = FAKETIME_TIMESTAMP)
+    cargo_run(["build", "--release", "--target=x86_64-unknown-linux-gnu", "--target-dir=" + build2_dir], logging, faketime = faketime)
 
 def check_artifacts(build1_dir, build2_dir):
     a1 = hash_artifacts(build1_dir, ["*.rlib", "*.a", "*.so"])
@@ -179,7 +183,7 @@ def check_electrscash_bin(build1_dir, build2_dir):
     return ok
 
 if not args.skip_build:
-    build(args.build1_dir, args.build2_dir)
+    build(args.build1_dir, args.build2_dir, args.enable_faketime)
 
 ok = check_artifacts(args.build1_dir, args.build2_dir)
 ok = ok and check_electrscash_bin(args.build1_dir, args.build2_dir)
