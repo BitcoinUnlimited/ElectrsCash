@@ -1,5 +1,6 @@
 # 0.7.1 (TBD)
 
+* Use `configure_me` instead of `clap` to support config files, environment variables and man pages (@Kixunil)
 * Revert LTO build (to fix deterministic build)
 * Allow stopping bulk indexing via SIGINT/SIGTERM
 * Cache list of transaction IDs for blocks
