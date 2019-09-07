@@ -9,7 +9,7 @@ Testing versions are [available here](https://bitcoincash.network:8001/). These 
 
 ## Building binaries
 
-Install [latest Rust](https://rustup.rs/) (1.32+)
+Install [latest Rust](https://rustup.rs/) (1.34+)
 
 Also, install the following packages (on Debian):
 ```bash
