@@ -1,9 +1,19 @@
 [general]
-env_prefix = "ELECTRS"
+env_prefix = "ELECTRSCASH"
 doc = """
-An efficient re-implementation of Electrum Server, inspired by ElectrumX, Electrum Personal Server and bitcoincore-indexd.
+An efficient implementation of Electrum Server, patch set on top of
+electrs.
 
-The motivation behind this project is to enable a user to run his own Electrum server, with required hardware resources not much beyond those of a full node. The server indexes the entire Bitcoin blockchain, and the resulting index enables fast queries for any given user wallet, allowing the user to keep real-time track of his balances and his transaction history using the Electrum wallet. Since it runs on the user's own machine, there is no need for the wallet to communicate with external Electrum servers, thus preserving the privacy of the user's addresses and balances."""
+The motivation behind this project is to improve the Bitcoin Cash infrastructure
+for lightweight clients, providing them with efficient backend services.
+
+ElectrsCash extends the original Electrum protocol, supporting additional
+technology well established in the ecosystem such as CashAccounts.
+
+The server indexes the entire Bitcoin Cash blockchain, and the resulting index enables fast queries for any given user wallet,
+allowing the user to keep real-time track of his balances and his transaction history using the [Electron Cash wallet](https://electroncash.org/).
+Since it runs on the user's own machine, there is no need for the wallet to communicate with external Electrum servers,
+thus preserving the privacy of the user's addresses and balances."""
 
 [[switch]]
 name = "verbose"
@@ -31,9 +41,6 @@ default = "crate::config::default_daemon_dir()"
 name = "cookie"
 type = "String"
 doc = "JSONRPC authentication cookie ('USER:PASSWORD', default: read from ~/.bitcoin/.cookie)"
-# Force the user to use config file in order to avoid password leaks
-argument = false
-env_var = false
 
 [[param]]
 name = "network"
