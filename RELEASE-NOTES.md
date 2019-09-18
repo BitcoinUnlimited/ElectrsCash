@@ -1,6 +1,7 @@
-# 0.7.1 (TBD)
+# 1.0.0 (18 September 2019)
 
-* Support Rust >=1.34 (for Debian)
+* Cache capacity is now defined in megabytes, rather than number of entries.
+* Support Rust >=1.34
 * Use `configure_me` instead of `clap` to support config files, environment variables and man pages (@Kixunil)
 * Revert LTO build (to fix deterministic build)
 * Allow stopping bulk indexing via SIGINT/SIGTERM
