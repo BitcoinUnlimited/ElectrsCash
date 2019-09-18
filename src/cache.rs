@@ -120,18 +120,17 @@ impl TransactionCache {
         F: FnOnce() -> Result<Vec<u8>>,
     {
         match self.map.lock().unwrap().get(txid) {
-            Some(serialized_txn) => Ok(deserialize(&serialized_txn).unwrap()),
-            None => {
-                let serialized_txn = load_txn_func()?;
-                let txn = deserialize(&serialized_txn).chain_err(|| "failed to parse cached tx")?;
-                let byte_size = 32 /* key (hash size) */ + serialized_txn.len();
-                self.map
-                    .lock()
-                    .unwrap()
-                    .put(*txid, serialized_txn, byte_size);
-                Ok(txn)
-            }
+            Some(serialized_txn) => return Ok(deserialize(&serialized_txn).unwrap()),
+            None => {}
         }
+        let serialized_txn = load_txn_func()?;
+        let txn = deserialize(&serialized_txn).chain_err(|| "failed to parse cached tx")?;
+        let byte_size = 32 /* key (hash size) */ + serialized_txn.len();
+        self.map
+            .lock()
+            .unwrap()
+            .put(*txid, serialized_txn, byte_size);
+        Ok(txn)
     }
 }
 
