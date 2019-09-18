@@ -144,13 +144,13 @@ fn create_merkle_branch_and_root(
 }
 
 // TODO: the functions below can be part of ReadStore.
-fn txrow_by_txid(store: &ReadStore, txid: &Sha256dHash) -> Option<TxRow> {
+fn txrow_by_txid(store: &dyn ReadStore, txid: &Sha256dHash) -> Option<TxRow> {
     let key = TxRow::filter_full(&txid);
     let value = store.get(&key)?;
     Some(TxRow::from_row(&Row { key, value }))
 }
 
-fn txrows_by_prefix(store: &ReadStore, txid_prefix: HashPrefix) -> Vec<TxRow> {
+fn txrows_by_prefix(store: &dyn ReadStore, txid_prefix: HashPrefix) -> Vec<TxRow> {
     store
         .scan(&TxRow::filter_prefix(txid_prefix))
         .iter()
@@ -158,7 +158,7 @@ fn txrows_by_prefix(store: &ReadStore, txid_prefix: HashPrefix) -> Vec<TxRow> {
         .collect()
 }
 
-fn txids_by_script_hash(store: &ReadStore, script_hash: &[u8]) -> Vec<HashPrefix> {
+fn txids_by_script_hash(store: &dyn ReadStore, script_hash: &[u8]) -> Vec<HashPrefix> {
     store
         .scan(&TxOutRow::filter(script_hash))
         .iter()
@@ -167,7 +167,7 @@ fn txids_by_script_hash(store: &ReadStore, script_hash: &[u8]) -> Vec<HashPrefix
 }
 
 fn txids_by_funding_output(
-    store: &ReadStore,
+    store: &dyn ReadStore,
     txn_id: &Sha256dHash,
     output_index: usize,
 ) -> Vec<HashPrefix> {
@@ -226,7 +226,7 @@ impl Query {
 
     fn load_txns_by_prefix(
         &self,
-        store: &ReadStore,
+        store: &dyn ReadStore,
         prefixes: Vec<HashPrefix>,
     ) -> Result<Vec<TxnHeight>> {
         let mut txns = vec![];
@@ -245,7 +245,7 @@ impl Query {
 
     fn find_spending_input(
         &self,
-        store: &ReadStore,
+        store: &dyn ReadStore,
         funding: &FundingOutput,
     ) -> Result<Option<SpendingInput>> {
         let spending_txns: Vec<TxnHeight> = self.load_txns_by_prefix(
