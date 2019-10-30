@@ -34,6 +34,6 @@ Note that this mapping allows us to use `getrawtransaction` RPC to retrieve actu
 
 Allows finding all transactions containing CashAccount registration by name and block height.
 
-|  Code  | Account name              | Registration TxID Prefix
+|  Code  | Account name              | Registration TxID Prefix   |   |
 | ------ | ------------------------- | -------------------------- | - |
 | `b'C'` | `SHA256(name#height)[:8]` | `txid[:8]`                 |   |
