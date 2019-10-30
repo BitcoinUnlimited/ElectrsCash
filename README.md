@@ -23,7 +23,7 @@ thus preserving the privacy of the user's addresses and balances.
  * Maintains an index over transaction inputs and outputs, allowing fast balance queries
  * Fast synchronization of the Bitcoin Cash blockchain on modest hardware
  * Low index storage overhead (~20%), relying on a local full node for transaction retrieval
- * `txindex` is not required for the Bitcoin node
+ * `txindex` is not required for the Bitcoin node, however it does improve performance
  * Uses a single [RocksDB](https://github.com/spacejam/rust-rocksdb) database, for better consistency and crash recovery
 
 ## Notable features unique to ElectrsCash
@@ -31,6 +31,7 @@ thus preserving the privacy of the user's addresses and balances.
  * [CashAccount support](https://honest.cash/v2/dagur/fast-cashaccount-lookups-using-bitbox-and-electrum-4781)
  * Supports major Bitcoin Cash full nodes, in addition to [full integration with Bitcoin Unlimited](https://github.com/BitcoinUnlimited/BitcoinUnlimited/blob/release/doc/bu-electrum-integration.md)
  * Deterministic builds
+ * [Integration tests with](doc/integration-tests.md) `bitcoind` in regtest
 
 ## Usage
 
