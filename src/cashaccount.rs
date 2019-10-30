@@ -119,7 +119,7 @@ pub fn index_cashaccount<'a>(txn: &'a Transaction, blockheight: usize) -> Result
     .to_row())
 }
 
-pub fn txids_by_cashaccount(store: &ReadStore, name: &str, height: usize) -> Vec<HashPrefix> {
+pub fn txids_by_cashaccount(store: &dyn ReadStore, name: &str, height: usize) -> Vec<HashPrefix> {
     store
         .scan(&TxCashAccountRow::filter(
             name.to_ascii_lowercase().as_bytes(),
