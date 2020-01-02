@@ -13,7 +13,7 @@ Cash Account is a popular naming system for sharing payment information on the B
 
 As currently implemented in existing wallets on Bitcoin Cash, including SPV wallets running on the Electrum network, the wallets query an [external lookup server](https://gitlab.com/cash-accounts/lookup-server) for payment information. Rather than relying on external lookup servers, we want to provide a method of querying this information directly from the electrum network.
 
-When the client does not need to connect to an external server, it will:
+Supporting Cash Account lookups via electrum servers can:
 
 * **Improve reliablity**: The client can use existing server connection for lookup, rather than depending on  additional servers.
 * **Improve privacy**: The lookup query exposes that the client is interested in specific payment information to the server. Having to request this query from fewer entities improves privacy.
@@ -26,7 +26,7 @@ We introduce a new protocol method `blockchain.cashaccount.lookup`. This method 
 
 ## blockchain.cashaccount.lookup
 
-Return a (optionally partal) sorted list of transactions that match cashaccount name and blockheight from given offset, total number of results and hash of the block for blockheight. The full transactions are returned for the client to decode the payment infromation.
+Return a sorted list of transactions that match cashaccount name and blockheight from given offset, number of results and the hash of the block at given blockheight. The full transactions are returned for the client to decode the payment infromation and verify the transaction itself.
 
 The transactions are sorted by their little endian hash value (same as canonical transaction order as inlemented on the Bitcoin Cash network).
 
@@ -36,7 +36,7 @@ The offset is zero-indexed offset into the sorted list of transactions.
 
 ### Signature
 
-`blockchain.cashaccount.query(cashaccount_name, blockheight, offset = 0)`
+`blockchain.cashaccount.lookup(cashaccount_name, blockheight, offset = 0)`
 
 #### *cashaccount_name*
 
@@ -91,6 +91,10 @@ This protocol extension can be discovered through the `servers.features` RPC met
 # Implementations
 
 * https://github.com/BitcoinUnlimited/ElectrsCash/pull/2 - Implementation of an earlier draft of this proposal
+
+# References
+
+* [Cash Account Specification](https://gitlab.com/cash-accounts/specification/blob/master/SPECIFICATION.md)
 
 # Copyright
 
