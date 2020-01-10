@@ -19,6 +19,7 @@ use crate::util::{spawn_thread, Channel, HeaderEntry, SyncChannel};
 
 const ELECTRSCASH_VERSION: &str = env!("CARGO_PKG_VERSION");
 const PROTOCOL_VERSION: &str = "1.4";
+const PROTOCOL_HASH_FUNCTION: &str = "sha256";
 
 // TODO: Sha256dHash should be a generic hash-container (since script hash is single SHA256)
 fn hash_from_value(val: Option<&Value>) -> Result<Sha256dHash> {
@@ -122,6 +123,17 @@ impl Connection {
 
     fn server_peers_subscribe(&self) -> Result<Value> {
         Ok(json!([]))
+    }
+
+    fn server_features(&self) -> Result<Value> {
+        let genesis_header = self.query.get_headers(&[0])[0].clone();
+        Ok(json!({
+            "genesis_hash" : genesis_header.hash().to_hex(),
+            "hash_function": PROTOCOL_HASH_FUNCTION,
+            "protocol_max": PROTOCOL_VERSION,
+            "protocol_min": PROTOCOL_VERSION,
+            "server_version": format!("ElectrsCash {}", ELECTRSCASH_VERSION)
+        }))
     }
 
     fn mempool_get_fee_histogram(&self) -> Result<Value> {
@@ -321,6 +333,7 @@ impl Connection {
             "server.peers.subscribe" => self.server_peers_subscribe(),
             "server.ping" => Ok(Value::Null),
             "server.version" => self.server_version(),
+            "server.features" => self.server_features(),
             "cashaccount.query.name" => self.cashaccount_query_name(&params),
             &_ => bail!("unknown method {} {:?}", method, params),
         };
