@@ -1,5 +1,7 @@
 [general]
 env_prefix = "ELECTRSCASH"
+conf_file_param = "conf"
+conf_dir_param = "conf_dir"
 doc = """
 An efficient implementation of Electrum Server, patch set on top of
 electrs.
@@ -40,13 +42,19 @@ default = "crate::config::default_daemon_dir()"
 [[param]]
 name = "cookie"
 type = "String"
-doc = "JSONRPC authentication cookie ('USER:PASSWORD', default: read from ~/.bitcoin/.cookie)"
+doc = "JSONRPC authentication cookie ('USER:PASSWORD', default: read from cookie file)"
+
+[[param]]
+name = "cookie_file"
+type = "std::path::PathBuf"
+doc = "JSONRPC authentication cookie file (default: ~/.bitcoin/.cookie)"
+# This is safe to configure on command line.
 
 [[param]]
 name = "network"
 type = "crate::config::BitcoinNetwork"
 convert_into = "::bitcoin::network::constants::Network"
-doc = "Select Bitcoin network type ('mainnet', 'testnet' or 'regtest')"
+doc = "Select Bitcoin network type ('bitcoin', 'testnet' or 'regtest')"
 default = "Default::default()"
 
 [[param]]

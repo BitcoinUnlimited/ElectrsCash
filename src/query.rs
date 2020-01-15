@@ -15,7 +15,7 @@ use crate::cashaccount::{has_cashaccount, txids_by_cashaccount};
 use crate::errors::*;
 use crate::index::{compute_script_hash, TxInRow, TxOutRow, TxRow};
 use crate::mempool::Tracker;
-use crate::metrics::Metrics;
+use crate::metrics::{HistogramOpts, HistogramVec, Metrics};
 use crate::store::{ReadStore, Row};
 use crate::util::{FullHash, HashPrefix, HeaderEntry};
 
@@ -183,6 +183,7 @@ pub struct Query {
     tracker: RwLock<Tracker>,
     tx_cache: TransactionCache,
     txid_limit: usize,
+    duration: HistogramVec,
 }
 
 impl Query {
@@ -197,6 +198,13 @@ impl Query {
             tracker: RwLock::new(Tracker::new(metrics)),
             tx_cache,
             txid_limit,
+            duration: metrics.histogram_vec(
+                HistogramOpts::new(
+                    "electrs_query_duration",
+                    "Time to update mempool (in seconds)",
+                ),
+                &["type"],
+            ),
         })
     }
 
@@ -315,12 +323,24 @@ impl Query {
     }
 
     pub fn status(&self, script_hash: &[u8]) -> Result<Status> {
+        let timer = self
+            .duration
+            .with_label_values(&["confirmed_status"])
+            .start_timer();
         let confirmed = self
             .confirmed_status(script_hash)
             .chain_err(|| "failed to get confirmed status")?;
+        timer.observe_duration();
+
+        let timer = self
+            .duration
+            .with_label_values(&["mempool_status"])
+            .start_timer();
         let mempool = self
             .mempool_status(script_hash, &confirmed.0)
             .chain_err(|| "failed to get mempool status")?;
+        timer.observe_duration();
+
         Ok(Status { confirmed, mempool })
     }
 
@@ -353,6 +373,7 @@ impl Query {
 
     // Internal API for transaction retrieval
     fn load_txn(&self, txid: &Sha256dHash, block_height: Option<u32>) -> Result<Transaction> {
+        let _timer = self.duration.with_label_values(&["load_txn"]).start_timer();
         self.tx_cache.get_or_else(&txid, || {
             let blockhash = self.lookup_confirmed_blockhash(txid, block_height)?;
             let value: Value = self
@@ -366,6 +387,10 @@ impl Query {
 
     // Public API for transaction retrieval (for Electrum RPC)
     pub fn get_transaction(&self, tx_hash: &Sha256dHash, verbose: bool) -> Result<Value> {
+        let _timer = self
+            .duration
+            .with_label_values(&["get_transaction"])
+            .start_timer();
         let blockhash = self.lookup_confirmed_blockhash(tx_hash, /*block_height*/ None)?;
         self.app
             .daemon()
@@ -373,6 +398,10 @@ impl Query {
     }
 
     pub fn get_headers(&self, heights: &[usize]) -> Vec<HeaderEntry> {
+        let _timer = self
+            .duration
+            .with_label_values(&["get_headers"])
+            .start_timer();
         let index = self.app.index();
         heights
             .iter()
@@ -462,6 +491,10 @@ impl Query {
     }
 
     pub fn update_mempool(&self) -> Result<()> {
+        let _timer = self
+            .duration
+            .with_label_values(&["update_mempool"])
+            .start_timer();
         self.tracker.write().unwrap().update(self.app.daemon())
     }
 

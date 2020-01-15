@@ -5,6 +5,7 @@ use bitcoin::blockdata::transaction::Transaction;
 use bitcoin::consensus::encode::deserialize;
 use bitcoin_hashes::sha256d::Hash as Sha256dHash;
 use lru::LruCache;
+use prometheus::IntGauge;
 use std::hash::Hash;
 use std::sync::Mutex;
 
@@ -13,15 +14,17 @@ struct SizedLruCache<K, V> {
     bytes_usage: usize,
     bytes_capacity: usize,
     lookups: CounterVec,
+    usage: IntGauge,
 }
 
 impl<K: Hash + Eq, V> SizedLruCache<K, V> {
-    fn new(bytes_capacity: usize, lookups: CounterVec) -> SizedLruCache<K, V> {
+    fn new(bytes_capacity: usize, lookups: CounterVec, usage: IntGauge) -> SizedLruCache<K, V> {
         SizedLruCache {
             map: LruCache::unbounded(),
             bytes_usage: 0,
             bytes_capacity,
             lookups,
+            usage,
         }
     }
 
@@ -50,9 +53,11 @@ impl<K: Hash + Eq, V> SizedLruCache<K, V> {
         while self.bytes_usage > self.bytes_capacity {
             match self.map.pop_lru() {
                 Some((_, (_, popped_size))) => self.bytes_usage -= popped_size,
-                None => return,
+                None => break,
             }
         }
+
+        self.usage.set(self.bytes_usage as i64);
     }
 }
 
@@ -69,8 +74,12 @@ impl BlockTxIDsCache {
             ),
             &["type"],
         );
+        let usage = metrics.gauge_int(MetricOpts::new(
+            "electrscash_blocktxids_cache_size",
+            "Cache usage for list of transactions in a block (bytes)",
+        ));
         BlockTxIDsCache {
-            map: Mutex::new(SizedLruCache::new(bytes_capacity, lookups)),
+            map: Mutex::new(SizedLruCache::new(bytes_capacity, lookups, usage)),
         }
     }
 
@@ -110,8 +119,12 @@ impl TransactionCache {
             ),
             &["type"],
         );
+        let usage = metrics.gauge_int(MetricOpts::new(
+            "electrs_transactions_cache_size",
+            "Cache usage for list of transactions (bytes)",
+        ));
         TransactionCache {
-            map: Mutex::new(SizedLruCache::new(bytes_capacity, lookups)),
+            map: Mutex::new(SizedLruCache::new(bytes_capacity, lookups, usage)),
         }
     }
 
@@ -120,11 +133,13 @@ impl TransactionCache {
         F: FnOnce() -> Result<Vec<u8>>,
     {
         match self.map.lock().unwrap().get(txid) {
-            Some(serialized_txn) => return Ok(deserialize(&serialized_txn).unwrap()),
+            Some(serialized_txn) => {
+                return Ok(deserialize(&serialized_txn).chain_err(|| "failed to parse cached tx")?);
+            }
             None => {}
         }
         let serialized_txn = load_txn_func()?;
-        let txn = deserialize(&serialized_txn).chain_err(|| "failed to parse cached tx")?;
+        let txn = deserialize(&serialized_txn).chain_err(|| "failed to parse serialized tx")?;
         let byte_size = 32 /* key (hash size) */ + serialized_txn.len();
         self.map
             .lock()
@@ -142,18 +157,22 @@ mod tests {
     #[test]
     fn test_sized_lru_cache_hit_and_miss() {
         let counter = CounterVec::new(prometheus::Opts::new("name", "help"), &["type"]).unwrap();
-        let mut cache = SizedLruCache::<i8, i32>::new(100, counter.clone());
+        let usage = IntGauge::new("usage", "help").unwrap();
+        let mut cache = SizedLruCache::<i8, i32>::new(100, counter.clone(), usage.clone());
         assert_eq!(counter.with_label_values(&["miss"]).get(), 0);
         assert_eq!(counter.with_label_values(&["hit"]).get(), 0);
+        assert_eq!(usage.get(), 0);
 
         assert_eq!(cache.get(&1), None); // no such key
         assert_eq!(counter.with_label_values(&["miss"]).get(), 1);
         assert_eq!(counter.with_label_values(&["hit"]).get(), 0);
+        assert_eq!(usage.get(), 0);
 
         cache.put(1, 10, 50); // add new key-value
         assert_eq!(cache.get(&1), Some(&10));
         assert_eq!(counter.with_label_values(&["miss"]).get(), 1);
         assert_eq!(counter.with_label_values(&["hit"]).get(), 1);
+        assert_eq!(usage.get(), 50);
 
         cache.put(3, 30, 50); // drop oldest key (1)
         cache.put(2, 20, 50);
@@ -162,6 +181,7 @@ mod tests {
         assert_eq!(cache.get(&3), Some(&30));
         assert_eq!(counter.with_label_values(&["miss"]).get(), 2);
         assert_eq!(counter.with_label_values(&["hit"]).get(), 3);
+        assert_eq!(usage.get(), 100);
 
         cache.put(3, 33, 50); // replace existing value
         assert_eq!(cache.get(&1), None);
@@ -169,6 +189,7 @@ mod tests {
         assert_eq!(cache.get(&3), Some(&33));
         assert_eq!(counter.with_label_values(&["miss"]).get(), 3);
         assert_eq!(counter.with_label_values(&["hit"]).get(), 5);
+        assert_eq!(usage.get(), 100);
 
         cache.put(9, 90, 9999); // larger than cache capacity, don't drop the cache
         assert_eq!(cache.get(&1), None);
@@ -177,6 +198,7 @@ mod tests {
         assert_eq!(cache.get(&9), None);
         assert_eq!(counter.with_label_values(&["miss"]).get(), 5);
         assert_eq!(counter.with_label_values(&["hit"]).get(), 7);
+        assert_eq!(usage.get(), 100);
     }
 
     fn gen_hash(seed: u8) -> Sha256dHash {
@@ -223,5 +245,37 @@ mod tests {
         cache.get_or_else(&block3, &miss_func).unwrap();
         cache.get_or_else(&block1, &miss_func).unwrap();
         assert_eq!(4, *misses.lock().unwrap());
+    }
+
+    #[test]
+    fn test_txn_cache() {
+        use bitcoin::util::hash::BitcoinHash;
+        use hex;
+
+        let dummy_metrics = Metrics::new("127.0.0.1:60000".parse().unwrap());
+        let cache = TransactionCache::new(1024, &dummy_metrics);
+        let tx_bytes = hex::decode("0100000001a15d57094aa7a21a28cb20b59aab8fc7d1149a3bdbcddba9c622e4f5f6a99ece010000006c493046022100f93bb0e7d8db7bd46e40132d1f8242026e045f03a0efe71bbb8e3f475e970d790221009337cd7f1f929f00cc6ff01f03729b069a7c21b59b1736ddfee5db5946c5da8c0121033b9b137ee87d5a812d6f506efdd37f0affa7ffc310711c06c7f3e097c9447c52ffffffff0100e1f505000000001976a9140389035a9225b3839e2bbf32d826a1e222031fd888ac00000000").unwrap();
+
+        let tx: Transaction = deserialize(&tx_bytes).unwrap();
+        let txid = tx.bitcoin_hash();
+
+        let mut misses = 0;
+        assert_eq!(
+            cache
+                .get_or_else(&txid, || {
+                    misses += 1;
+                    Ok(tx_bytes.clone())
+                })
+                .unwrap(),
+            tx
+        );
+        assert_eq!(misses, 1);
+        assert_eq!(
+            cache
+                .get_or_else(&txid, || panic!("should not be called"))
+                .unwrap(),
+            tx
+        );
+        assert_eq!(misses, 1);
     }
 }
