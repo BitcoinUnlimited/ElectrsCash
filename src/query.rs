@@ -14,16 +14,23 @@ use crate::cache::TransactionCache;
 use crate::cashaccount::{has_cashaccount, txids_by_cashaccount};
 use crate::errors::*;
 use crate::index::{compute_script_hash, TxInRow, TxOutRow, TxRow};
-use crate::mempool::Tracker;
+use crate::mempool::{Tracker, MEMPOOL_HEIGHT};
 use crate::metrics::{HistogramOpts, HistogramVec, Metrics};
 use crate::store::{ReadStore, Row};
 use crate::util::{FullHash, HashPrefix, HeaderEntry};
+
+enum ConfirmationState {
+    Confirmed,
+    InMempool,
+    UnconfirmedParent,
+}
 
 pub struct FundingOutput {
     pub txn_id: Sha256dHash,
     pub height: u32,
     pub output_index: usize,
     pub value: u64,
+    state: ConfirmationState,
 }
 
 type OutPoint = (Sha256dHash, usize); // (txid, output_index)
@@ -33,6 +40,7 @@ struct SpendingInput {
     height: u32,
     funding_output: OutPoint,
     value: u64,
+    state: ConfirmationState,
 }
 
 pub struct Status {
@@ -66,14 +74,45 @@ impl Status {
     pub fn history(&self) -> Vec<(i32, Sha256dHash)> {
         let mut txns_map = HashMap::<Sha256dHash, i32>::new();
         for f in self.funding() {
-            txns_map.insert(f.txn_id, f.height as i32);
+            let height: i32 = match f.state {
+                ConfirmationState::Confirmed => f.height as i32,
+                ConfirmationState::InMempool => 0,
+                ConfirmationState::UnconfirmedParent => -1,
+            };
+
+            txns_map.insert(f.txn_id, height);
         }
         for s in self.spending() {
-            txns_map.insert(s.txn_id, s.height as i32);
+            let height: i32 = match s.state {
+                ConfirmationState::Confirmed => s.height as i32,
+                ConfirmationState::InMempool => 0,
+                ConfirmationState::UnconfirmedParent => -1,
+            };
+            txns_map.insert(s.txn_id, height as i32);
         }
         let mut txns: Vec<(i32, Sha256dHash)> =
             txns_map.into_iter().map(|item| (item.1, item.0)).collect();
-        txns.sort_unstable();
+        txns.sort_unstable_by(|a, b| {
+            if a.0 == b.0 {
+                // Order by little endian tx hash if height is the same,
+                // in most cases, this order is the same as on the blockchain.
+                return b.1.cmp(&a.1);
+            }
+            if a.0 > 0 && b.0 > 0 {
+                return a.0.cmp(&b.0);
+            }
+
+            // mempool txs should be sorted last, so add to it a large number
+            let mut a_height = a.0;
+            let mut b_height = b.0;
+            if a_height <= 0 {
+                a_height = 0xEEEEEE + a_height.abs();
+            }
+            if b_height <= 0 {
+                b_height = 0xEEEEEE + b_height.abs();
+            }
+            return a_height.cmp(&b_height);
+        });
         txns
     }
 
@@ -248,6 +287,7 @@ impl Query {
                         height: t.height,
                         funding_output: (funding.txn_id, funding.output_index),
                         value: funding.value,
+                        state: self.check_confirmation_state(t),
                     })
                 }
             }
@@ -260,6 +300,21 @@ impl Query {
         })
     }
 
+    fn check_confirmation_state(&self, t: &TxnHeight) -> ConfirmationState {
+        if t.height != MEMPOOL_HEIGHT {
+            return ConfirmationState::Confirmed;
+        }
+
+        // Check if any of our inputs are unconfirmed
+        for input in t.txn.input.iter() {
+            let prevout = &input.previous_output.txid;
+            if self.tracker.read().unwrap().contains(prevout) {
+                return ConfirmationState::UnconfirmedParent;
+            }
+        }
+        ConfirmationState::InMempool
+    }
+
     fn find_funding_outputs(&self, t: &TxnHeight, script_hash: &[u8]) -> Vec<FundingOutput> {
         let mut result = vec![];
         let txn_id = t.txn.txid();
@@ -270,6 +325,7 @@ impl Query {
                     height: t.height,
                     output_index: index,
                     value: output.value,
+                    state: self.check_confirmation_state(t),
                 })
             }
         }
@@ -548,7 +604,7 @@ impl Query {
         self.app.get_banner()
     }
 
-    pub fn get_cashaccount_txs(&self, name: &str, height: usize) -> Result<Value> {
+    pub fn get_cashaccount_txs(&self, name: &str, height: u32) -> Result<Value> {
         let cashaccount_txns: Vec<TxnHeight> = self.load_txns_by_prefix(
             self.app.read_store(),
             txids_by_cashaccount(self.app.read_store(), name, height),

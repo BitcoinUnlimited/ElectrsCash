@@ -1,5 +1,6 @@
 extern crate scopeguard;
 use crate::errors::*;
+use crate::mempool::MEMPOOL_HEIGHT;
 use crate::store::ReadStore;
 use crate::store::Row;
 use crate::util::{hash_prefix, Bytes, FullHash, HashPrefix};
@@ -16,7 +17,7 @@ use crypto::digest::Digest;
 use crypto::sha2::Sha256;
 use std::ffi::CStr;
 
-fn compute_accountname_hash(accountname: &[u8], blockheight: usize) -> FullHash {
+fn compute_accountname_hash(accountname: &[u8], blockheight: u32) -> FullHash {
     let mut hash = FullHash::default();
     let mut sha2 = Sha256::new();
     sha2.input(accountname);
@@ -38,7 +39,7 @@ pub struct TxCashAccountRow {
 }
 
 impl TxCashAccountRow {
-    pub fn new(txid: &Sha256dHash, accountname: &[u8], blockheight: usize) -> TxCashAccountRow {
+    pub fn new(txid: &Sha256dHash, accountname: &[u8], blockheight: u32) -> TxCashAccountRow {
         TxCashAccountRow {
             key: TxCashAccountKey {
                 code: b'C',
@@ -51,7 +52,7 @@ impl TxCashAccountRow {
         }
     }
 
-    pub fn filter(accountname: &[u8], blockheight: usize) -> Bytes {
+    pub fn filter(accountname: &[u8], blockheight: u32) -> Bytes {
         bincode::serialize(&TxCashAccountKey {
             code: b'C',
             accout_hash_prefix: hash_prefix(&compute_accountname_hash(accountname, blockheight)),
@@ -101,7 +102,10 @@ fn parse_cashaccount(account: *mut CashAccount, txn: &Transaction) -> bool {
     cashaccount_found
 }
 
-pub fn index_cashaccount<'a>(txn: &'a Transaction, blockheight: usize) -> Result<Row> {
+pub fn index_cashaccount<'a>(txn: &'a Transaction, blockheight: u32) -> Result<Row> {
+    if blockheight == MEMPOOL_HEIGHT {
+        return Err("can't index mempool".into());
+    }
     let account = unsafe { cashacc_account_init() };
     let _dest = scopeguard::guard((), |_| {
         unsafe { cashacc_account_destroy(account) };
@@ -119,7 +123,7 @@ pub fn index_cashaccount<'a>(txn: &'a Transaction, blockheight: usize) -> Result
     .to_row())
 }
 
-pub fn txids_by_cashaccount(store: &dyn ReadStore, name: &str, height: usize) -> Vec<HashPrefix> {
+pub fn txids_by_cashaccount(store: &dyn ReadStore, name: &str, height: u32) -> Vec<HashPrefix> {
     store
         .scan(&TxCashAccountRow::filter(
             name.to_ascii_lowercase().as_bytes(),

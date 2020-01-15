@@ -178,7 +178,7 @@ pub fn index_transaction<'a>(
     let null_hash = Sha256dHash::default();
     let txid: Sha256dHash = txn.txid();
 
-    let cashaccount = index_cashaccount(txn, height);
+    let cashaccount = index_cashaccount(txn, height as u32);
 
     let inputs = txn.input.iter().filter_map(move |input| {
         if input.previous_output.txid == null_hash {
