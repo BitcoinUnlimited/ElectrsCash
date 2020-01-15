@@ -609,11 +609,21 @@ impl RPC {
                     "waiting for {} RPC handling threads",
                     handles.lock().unwrap().len()
                 );
-                for (_, handle) in handles.lock().unwrap().drain() {
-                    if let Err(e) = handle.join() {
-                        warn!("failed to join thread: {:?}", e);
+
+                let handle_ids: Vec<i32> =
+                    handles.lock().unwrap().keys().map(|i| i.clone()).collect();
+                for id in handle_ids {
+                    let h = handles.lock().unwrap().remove(&id);
+                    match h {
+                        Some(h) => {
+                            if let Err(e) = h.join() {
+                                warn!("failed to join thread: {:?}", e);
+                            }
+                        }
+                        None => {}
                     }
                 }
+
                 trace!("RPC connections are closed");
             })),
         }
