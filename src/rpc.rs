@@ -2,10 +2,11 @@ use bitcoin::blockdata::transaction::Transaction;
 use bitcoin::consensus::encode::{deserialize, serialize};
 use bitcoin_hashes::hex::{FromHex, ToHex};
 use bitcoin_hashes::sha256d::Hash as Sha256dHash;
+use bitcoin_hashes::Hash;
 use error_chain::ChainedError;
 use hex;
 use serde_json::{from_str, Value};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::io::{BufRead, BufReader, Write};
 use std::net::{Shutdown, SocketAddr, TcpListener, TcpStream};
 use std::sync::mpsc::{Sender, SyncSender};
@@ -13,8 +14,10 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 
 use crate::errors::*;
+use crate::index::compute_script_hash;
 use crate::metrics::{Gauge, HistogramOpts, HistogramVec, MetricOpts, Metrics};
 use crate::query::{Query, Status};
+use crate::util::FullHash;
 use crate::util::{spawn_thread, Channel, HeaderEntry, SyncChannel};
 
 const ELECTRSCASH_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -68,6 +71,17 @@ fn unspent_from_status(status: &Status) -> Value {
             }))
             .collect()
     ))
+}
+
+fn get_output_scripthash(txn: &Transaction, n: Option<usize>) -> Vec<FullHash> {
+    if let Some(out) = n {
+        vec![compute_script_hash(&txn.output[out].script_pubkey[..])]
+    } else {
+        txn.output
+            .iter()
+            .map(|o| compute_script_hash(&o.script_pubkey[..]))
+            .collect()
+    }
 }
 
 struct Connection {
@@ -215,6 +229,9 @@ impl Connection {
         let status = self.query.status(&script_hash[..])?;
         let result = status.hash().map_or(Value::Null, |h| json!(hex::encode(h)));
         self.status_hashes.insert(script_hash, result.clone());
+        self.stats
+            .subscriptions
+            .set(self.status_hashes.len() as i64);
         Ok(result)
     }
 
@@ -249,10 +266,6 @@ impl Connection {
         let tx = hex::decode(&tx).chain_err(|| "non-hex tx")?;
         let tx: Transaction = deserialize(&tx).chain_err(|| "failed to parse tx")?;
         let txid = self.query.broadcast(&tx)?;
-        self.query.update_mempool()?;
-        if let Err(e) = self.chan.sender().try_send(Message::PeriodicUpdate) {
-            warn!("failed to issue PeriodicUpdate after broadcast: {}", e);
-        }
         Ok(json!(txid.to_hex()))
     }
 
@@ -354,42 +367,63 @@ impl Connection {
         })
     }
 
-    fn update_subscriptions(&mut self) -> Result<Vec<Value>> {
+    fn on_scripthash_change(&mut self, scripthash: FullHash) -> Result<()> {
+        let scripthash = Sha256dHash::from_slice(&scripthash[..]).expect("invalid scripthash");
+
+        let old_statushash;
+        match self.status_hashes.get(&scripthash) {
+            Some(statushash) => {
+                old_statushash = statushash;
+            }
+            None => {
+                return Ok(());
+            }
+        };
+
         let timer = self
             .stats
             .latency
-            .with_label_values(&["periodic_update"])
+            .with_label_values(&["statushash_update"])
             .start_timer();
-        let mut result = vec![];
-        if let Some(ref mut last_entry) = self.last_header_entry {
-            let entry = self.query.get_best_header()?;
-            if *last_entry != entry {
-                *last_entry = entry;
-                let hex_header = hex::encode(serialize(last_entry.header()));
-                let header = json!({"hex": hex_header, "height": last_entry.height()});
-                result.push(json!({
-                    "jsonrpc": "2.0",
-                    "method": "blockchain.headers.subscribe",
-                    "params": [header]}));
-            }
-        }
-        for (script_hash, status_hash) in self.status_hashes.iter_mut() {
-            let status = self.query.status(&script_hash[..])?;
-            let new_status_hash = status.hash().map_or(Value::Null, |h| json!(hex::encode(h)));
-            if new_status_hash == *status_hash {
-                continue;
-            }
-            result.push(json!({
-                "jsonrpc": "2.0",
-                "method": "blockchain.scripthash.subscribe",
-                "params": [script_hash.to_hex(), new_status_hash]}));
-            *status_hash = new_status_hash;
+
+        let status = self.query.status(&scripthash[..])?;
+        let new_statushash = status.hash().map_or(Value::Null, |h| json!(hex::encode(h)));
+        if new_statushash == *old_statushash {
+            return Ok(());
         }
         timer.observe_duration();
-        self.stats
-            .subscriptions
-            .set(self.status_hashes.len() as i64);
-        Ok(result)
+        self.send_values(&vec![json!({
+                    "jsonrpc": "2.0",
+                    "method": "blockchain.scripthash.subscribe",
+                    "params": [scripthash.to_hex(), new_statushash]})])?;
+        self.status_hashes.insert(scripthash, new_statushash);
+        Ok(())
+    }
+
+    fn on_chaintip_change(&mut self, chaintip: HeaderEntry) -> Result<()> {
+        let timer = self
+            .stats
+            .latency
+            .with_label_values(&["chaintip_update"])
+            .start_timer();
+
+        if let Some(ref mut last_entry) = self.last_header_entry {
+            if *last_entry == chaintip {
+                return Ok(());
+            }
+
+            *last_entry = chaintip;
+            let hex_header = hex::encode(serialize(last_entry.header()));
+            let header = json!({"hex": hex_header, "height": last_entry.height()});
+            self.send_values(&vec![
+                (json!({
+                "jsonrpc": "2.0",
+                "method": "blockchain.headers.subscribe",
+                "params": [header]})),
+            ])?;
+        }
+        timer.observe_duration();
+        Ok(())
     }
 
     fn send_values(&mut self, values: &[Value]) -> Result<()> {
@@ -406,9 +440,9 @@ impl Connection {
         let empty_params = json!([]);
         loop {
             let msg = self.chan.receiver().recv().chain_err(|| "channel closed")?;
-            trace!("RPC {:?}", msg);
             match msg {
                 Message::Request(line) => {
+                    trace!("RPC {:?}", line);
                     let cmd: Value = from_str(&line).chain_err(|| "invalid JSON format")?;
                     let reply = match (
                         cmd.get("method"),
@@ -424,12 +458,8 @@ impl Connection {
                     };
                     self.send_values(&[reply])?
                 }
-                Message::PeriodicUpdate => {
-                    let values = self
-                        .update_subscriptions()
-                        .chain_err(|| "failed to update subscriptions")?;
-                    self.send_values(&values)?
-                }
+                Message::ScriptHashChange(hash) => self.on_scripthash_change(hash)?,
+                Message::ChainTipChange(tip) => self.on_chaintip_change(tip)?,
                 Message::Done => return Ok(()),
             }
         }
@@ -485,18 +515,21 @@ impl Connection {
 #[derive(Debug)]
 pub enum Message {
     Request(String),
-    PeriodicUpdate,
+    ScriptHashChange(FullHash),
+    ChainTipChange(HeaderEntry),
     Done,
 }
 
 pub enum Notification {
-    Periodic,
+    ScriptHashChange(FullHash),
+    ChainTipChange(HeaderEntry),
     Exit,
 }
 
 pub struct RPC {
     notification: Sender<Notification>,
     server: Option<thread::JoinHandle<()>>, // so we can join the server while dropping this ojbect
+    query: Arc<Query>,
 }
 
 struct Stats {
@@ -514,10 +547,17 @@ impl RPC {
             for msg in notification.receiver().iter() {
                 let senders = senders.lock().unwrap();
                 match msg {
-                    Notification::Periodic => {
+                    Notification::ScriptHashChange(hash) => {
                         for (i, sender) in senders.iter() {
-                            if let Err(e) = sender.try_send(Message::PeriodicUpdate) {
-                                warn!("failed to send PeriodicUpdate to peer {}: {}", i, e);
+                            if let Err(e) = sender.try_send(Message::ScriptHashChange(hash)) {
+                                warn!("failed to send ScriptHashChange to peer {}: {}", i, e);
+                            }
+                        }
+                    }
+                    Notification::ChainTipChange(hash) => {
+                        for (i, sender) in senders.iter() {
+                            if let Err(e) = sender.try_send(Message::ChainTipChange(hash.clone())) {
+                                warn!("failed to send ChainTipChange to peer {}: {}", i, e);
                             }
                         }
                     }
@@ -562,6 +602,7 @@ impl RPC {
         let notification = Channel::unbounded();
         RPC {
             notification: notification.sender(),
+            query: query.clone(),
             server: Some(spawn_thread("rpc", move || {
                 let senders = Arc::new(Mutex::new(HashMap::<i32, SyncSender<Message>>::new()));
                 let handles = Arc::new(Mutex::new(
@@ -629,8 +670,81 @@ impl RPC {
         }
     }
 
-    pub fn notify(&self) {
-        self.notification.send(Notification::Periodic).unwrap();
+    fn get_scripthashes_effected_by_tx(
+        &self,
+        txid: &Sha256dHash,
+        blockhash: Option<Sha256dHash>,
+    ) -> Result<Vec<FullHash>> {
+        let txn = self.query.load_txn_with_blockhashlookup(txid, blockhash)?;
+        let mut scripthashes = get_output_scripthash(&txn, None);
+
+        for txin in txn.input {
+            if txin.previous_output.is_null() {
+                continue;
+            }
+            let id: &Sha256dHash = &txin.previous_output.txid;
+            let n = txin.previous_output.vout as usize;
+
+            let txn = self.query.load_txn_with_blockhashlookup(&id, None)?;
+            scripthashes.extend(get_output_scripthash(&txn, Some(n)));
+        }
+        Ok(scripthashes)
+    }
+
+    pub fn notify_scripthash_subscriptions(
+        &self,
+        headers_changed: &Vec<HeaderEntry>,
+        txs_changed: HashSet<Sha256dHash>,
+    ) {
+        let mut txn_done: HashSet<Sha256dHash> = HashSet::new();
+        let mut scripthashes: HashSet<FullHash> = HashSet::new();
+
+        let mut insert_for_tx = |txid, blockhash| {
+            if !txn_done.insert(txid) {
+                return;
+            }
+            if let Ok(hashes) = self.get_scripthashes_effected_by_tx(&txid, blockhash) {
+                for h in hashes {
+                    scripthashes.insert(h);
+                }
+            } else {
+                trace!("failed to get effected scripthashes for tx {}", txid);
+            }
+        };
+
+        for header in headers_changed {
+            let blockhash = header.hash();
+            let txids = match self.query.getblocktxids(&blockhash) {
+                Ok(txids) => txids,
+                Err(e) => {
+                    warn!("Failed to get blocktxids for {}: {}", blockhash, e);
+                    continue;
+                }
+            };
+            for txid in txids {
+                insert_for_tx(txid, Some(*blockhash));
+            }
+        }
+        for txid in txs_changed {
+            insert_for_tx(txid, None);
+        }
+
+        for s in scripthashes.drain() {
+            if let Err(e) = self.notification.send(Notification::ScriptHashChange(s)) {
+                trace!("Scripthash change notification failed: {}", e);
+            }
+        }
+    }
+
+    pub fn notify_subscriptions_chaintip(&self, header: HeaderEntry) {
+        if let Err(e) = self.notification.send(Notification::ChainTipChange(header)) {
+            trace!("Failed to notify about chaintip change {}", e);
+        }
+    }
+
+    pub fn disconnect_clients(&self) {
+        trace!("disconncting clients");
+        self.notification.send(Notification::Exit).unwrap();
     }
 }
 
