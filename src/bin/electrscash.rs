@@ -63,24 +63,12 @@ fn run_server(config: &Config) -> Result<()> {
 
     let mut server = None; // Electrum RPC server
 
-    // If we see this more new blocks than this, don't look for scripthash
-    // changes. Just have clients reconnect.
-    //
-    // This many header changes means we're either not fully synced, or there
-    // has been abnormally large reorg of the blockchain.
-    const MAX_SCRIPTHASH_BLOCKS: usize = 20;
-
     loop {
         let (headers_changed, new_tip) = app.update(&signal)?;
         let txs_changed = query.update_mempool()?;
         let rpc = server
             .get_or_insert_with(|| RPC::start(config.electrum_rpc_addr, query.clone(), &metrics));
-        if headers_changed.len() > MAX_SCRIPTHASH_BLOCKS {
-            warn!("Large re-org, disconnecting clients");
-            rpc.disconnect_clients();
-        } else {
-            rpc.notify_scripthash_subscriptions(&headers_changed, txs_changed);
-        }
+        rpc.notify_scripthash_subscriptions(&headers_changed, txs_changed);
         if let Some(header) = new_tip {
             rpc.notify_subscriptions_chaintip(header);
         }
