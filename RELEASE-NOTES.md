@@ -1,3 +1,8 @@
+# 1.1.0 (TBD)
+* Allow setting `--cookie-file` path via configuration
+* Setting `--network` now takes `bitcoin` instead of `mainnet` as parameter
+* Clean up RPC threads after connection is closed
+
 # 1.0.0 (18 September 2019)
 
 * Cache capacity is now defined in megabytes, rather than number of entries.
