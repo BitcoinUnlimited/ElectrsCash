@@ -436,13 +436,14 @@ impl Query {
         &self,
         txid: &Sha256dHash,
         blockhash: Option<Sha256dHash>,
+        blockheight: Option<u32>,
     ) -> Result<Transaction> {
         if let Some(tx) = self.tracker.read().unwrap().get_txn(&txid) {
             return Ok(tx);
         }
         let hash: Option<Sha256dHash> = match blockhash {
             Some(hash) => Some(hash),
-            None => match self.lookup_confirmed_blockhash(txid, None) {
+            None => match self.lookup_confirmed_blockhash(txid, blockheight) {
                 Ok(hash) => hash,
                 Err(_) => None,
             },
