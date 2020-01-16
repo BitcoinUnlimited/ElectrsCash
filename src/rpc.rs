@@ -315,7 +315,7 @@ impl Connection {
         let name = name.as_str().chain_err(|| "bad accountname")?;
         let height = usize_from_value(params.get(1), "height")?;
 
-        self.query.get_cashaccount_txs(name, height)
+        self.query.get_cashaccount_txs(name, height as u32)
     }
 
     fn handle_command(&mut self, method: &str, params: &[Value], id: &Value) -> Result<Value> {
