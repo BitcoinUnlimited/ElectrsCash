@@ -15,6 +15,7 @@ use std::thread;
 
 use crate::errors::*;
 use crate::index::compute_script_hash;
+use crate::mempool::MEMPOOL_HEIGHT;
 use crate::metrics::{Gauge, HistogramOpts, HistogramVec, MetricOpts, Metrics};
 use crate::query::{Query, Status};
 use crate::util::FullHash;
@@ -157,7 +158,8 @@ impl Connection {
             "hash_function": PROTOCOL_HASH_FUNCTION,
             "protocol_max": PROTOCOL_VERSION,
             "protocol_min": PROTOCOL_VERSION,
-            "server_version": format!("ElectrsCash {}", ELECTRSCASH_VERSION)
+            "server_version": format!("ElectrsCash {}", ELECTRSCASH_VERSION),
+            "firstuse": ["1.0"]
         }))
     }
 
@@ -271,6 +273,42 @@ impl Connection {
         Ok(unspent_from_status(&self.query.status(&script_hash[..])?))
     }
 
+    fn blockchain_scripthash_get_first_use(&self, params: &[Value]) -> Result<Value> {
+        let scripthash = hash_from_value(params.get(0)).chain_err(|| "bad script_hash")?;
+
+        let to_fullhash = |h: &Sha256dHash| -> [u8; 32] {
+            let mut res = [0; 32];
+            res[..].copy_from_slice(&h[..]);
+            res
+        };
+
+        let firstuse = self.query.scripthash_first_use(&to_fullhash(&scripthash))?;
+        if firstuse.0 == 0 {
+            return Err(ErrorKind::RpcError(
+                RpcErrorCode::NotFound,
+                format!("scripthash '{}' not found", scripthash.to_hex()),
+            )
+            .into());
+        }
+        let hash = if firstuse.0 == MEMPOOL_HEIGHT {
+            Sha256dHash::default()
+        } else {
+            let h = self.query.get_headers(&[firstuse.0 as usize]);
+            if h.is_empty() {
+                warn!("expected to find header for height {}", firstuse.0);
+                Sha256dHash::default()
+            } else {
+                *h[0].hash()
+            }
+        };
+
+        Ok(json!({
+            "block_hash": hash.to_hex(),
+            "block_height": if firstuse.0 == MEMPOOL_HEIGHT { 0 } else { firstuse.0 },
+            "tx_hash": firstuse.1.to_hex()
+        }))
+    }
+
     fn blockchain_transaction_broadcast(&self, params: &[Value]) -> Result<Value> {
         let tx = params.get(0).chain_err(|| rpc_arg_error("missing tx"))?;
         let tx = tx.as_str().chain_err(|| rpc_arg_error("non-string tx"))?;
@@ -348,6 +386,9 @@ impl Connection {
             "blockchain.scripthash.get_history" => self.blockchain_scripthash_get_history(&params),
             "blockchain.scripthash.listunspent" => self.blockchain_scripthash_listunspent(&params),
             "blockchain.scripthash.subscribe" => self.blockchain_scripthash_subscribe(&params),
+            "blockchain.scripthash.get_first_use" => {
+                self.blockchain_scripthash_get_first_use(&params)
+            }
             "blockchain.transaction.broadcast" => self.blockchain_transaction_broadcast(&params),
             "blockchain.transaction.get" => self.blockchain_transaction_get(&params),
             "blockchain.transaction.get_merkle" => self.blockchain_transaction_get_merkle(&params),

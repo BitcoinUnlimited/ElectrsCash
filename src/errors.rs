@@ -6,6 +6,7 @@ pub enum RpcErrorCode {
     InvalidParams = -32602,
     InternalError = -32603,
     Other = -32000, /* Range -32000 to -32099 is serve defined */
+    NotFound = -32004,
 }
 
 error_chain! {
