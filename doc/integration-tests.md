@@ -6,4 +6,4 @@ To run the tests, you need to [download and build Bitcoin Unlimited](https://git
 
 After you can run the tests directly by calling `./qa/rpc-tests/electrum_basics.py` from the Bitcoin Unlimited root directory.
 
-The tests assume ElectrsCash binary is located at `<BitcoinUnlimited/src/electrscash>`. To have it run your build, you can either symlink it there, or you can pass the parameter `--electrumbin`, such as `./qa/rpc-tests/electrum_basics.py --electrumbin=/home/user/ElectrsCash/target/debug/electrscash`.
+The tests assume ElectrsCash binary is located at `<BitcoinUnlimited/src/electrscash>`. To have it run your build, you can either symlink it there, or you can pass the parameter `--electrum.exec`, such as `./qa/rpc-tests/electrum_basics.py --electrum.exec=/home/user/ElectrsCash/target/debug/electrscash`.
