@@ -24,17 +24,26 @@ const ELECTRSCASH_VERSION: &str = env!("CARGO_PKG_VERSION");
 const PROTOCOL_VERSION: &str = "1.4";
 const PROTOCOL_HASH_FUNCTION: &str = "sha256";
 
+fn rpc_arg_error(what: &str) -> ErrorKind {
+    ErrorKind::RpcError(RpcErrorCode::InvalidParams, what.to_string())
+}
+
 // TODO: Sha256dHash should be a generic hash-container (since script hash is single SHA256)
 fn hash_from_value(val: Option<&Value>) -> Result<Sha256dHash> {
-    let script_hash = val.chain_err(|| "missing hash")?;
-    let script_hash = script_hash.as_str().chain_err(|| "non-string hash")?;
-    let script_hash = Sha256dHash::from_hex(script_hash).chain_err(|| "non-hex hash")?;
+    let script_hash = val.chain_err(|| rpc_arg_error("missing hash"))?;
+    let script_hash = script_hash
+        .as_str()
+        .chain_err(|| rpc_arg_error("non-string hash"))?;
+    let script_hash =
+        Sha256dHash::from_hex(script_hash).chain_err(|| rpc_arg_error("non-hex hash"))?;
     Ok(script_hash)
 }
 
 fn usize_from_value(val: Option<&Value>, name: &str) -> Result<usize> {
-    let val = val.chain_err(|| format!("missing {}", name))?;
-    let val = val.as_u64().chain_err(|| format!("non-integer {}", name))?;
+    let val = val.chain_err(|| rpc_arg_error(&format!("missing {}", name)))?;
+    let val = val
+        .as_u64()
+        .chain_err(|| rpc_arg_error(&format!("non-integer {}", name)))?;
     Ok(val as usize)
 }
 
@@ -46,8 +55,10 @@ fn usize_from_value_or(val: Option<&Value>, name: &str, default: usize) -> Resul
 }
 
 fn bool_from_value(val: Option<&Value>, name: &str) -> Result<bool> {
-    let val = val.chain_err(|| format!("missing {}", name))?;
-    let val = val.as_bool().chain_err(|| format!("not a bool {}", name))?;
+    let val = val.chain_err(|| rpc_arg_error(&format!("missing {}", name)))?;
+    let val = val
+        .as_bool()
+        .chain_err(|| rpc_arg_error(&format!("not a bool {}", name)))?;
     Ok(val)
 }
 
@@ -236,7 +247,7 @@ impl Connection {
     }
 
     fn blockchain_scripthash_get_balance(&self, params: &[Value]) -> Result<Value> {
-        let script_hash = hash_from_value(params.get(0)).chain_err(|| "bad script_hash")?;
+        let script_hash = hash_from_value(params.get(0))?;
         let status = self.query.status(&script_hash[..])?;
         Ok(
             json!({ "confirmed": status.confirmed_balance(), "unconfirmed": status.mempool_balance() }),
@@ -244,7 +255,7 @@ impl Connection {
     }
 
     fn blockchain_scripthash_get_history(&self, params: &[Value]) -> Result<Value> {
-        let script_hash = hash_from_value(params.get(0)).chain_err(|| "bad script_hash")?;
+        let script_hash = hash_from_value(params.get(0))?;
         let status = self.query.status(&script_hash[..])?;
         Ok(json!(Value::Array(
             status
@@ -256,21 +267,24 @@ impl Connection {
     }
 
     fn blockchain_scripthash_listunspent(&self, params: &[Value]) -> Result<Value> {
-        let script_hash = hash_from_value(params.get(0)).chain_err(|| "bad script_hash")?;
+        let script_hash = hash_from_value(params.get(0))?;
         Ok(unspent_from_status(&self.query.status(&script_hash[..])?))
     }
 
     fn blockchain_transaction_broadcast(&self, params: &[Value]) -> Result<Value> {
-        let tx = params.get(0).chain_err(|| "missing tx")?;
-        let tx = tx.as_str().chain_err(|| "non-string tx")?;
-        let tx = hex::decode(&tx).chain_err(|| "non-hex tx")?;
-        let tx: Transaction = deserialize(&tx).chain_err(|| "failed to parse tx")?;
-        let txid = self.query.broadcast(&tx)?;
+        let tx = params.get(0).chain_err(|| rpc_arg_error("missing tx"))?;
+        let tx = tx.as_str().chain_err(|| rpc_arg_error("non-string tx"))?;
+        let tx = hex::decode(&tx).chain_err(|| rpc_arg_error("non-hex tx"))?;
+        let tx: Transaction = deserialize(&tx).chain_err(|| rpc_arg_error("failed to parse tx"))?;
+        let txid = self
+            .query
+            .broadcast(&tx)
+            .chain_err(|| rpc_arg_error("rejected by network"))?;
         Ok(json!(txid.to_hex()))
     }
 
     fn blockchain_transaction_get(&self, params: &[Value]) -> Result<Value> {
-        let tx_hash = hash_from_value(params.get(0)).chain_err(|| "bad tx_hash")?;
+        let tx_hash = hash_from_value(params.get(0))?;
         let verbose = match params.get(1) {
             Some(value) => value.as_bool().chain_err(|| "non-bool verbose value")?,
             None => false,
@@ -279,7 +293,7 @@ impl Connection {
     }
 
     fn blockchain_transaction_get_merkle(&self, params: &[Value]) -> Result<Value> {
-        let tx_hash = hash_from_value(params.get(0)).chain_err(|| "bad tx_hash")?;
+        let tx_hash = hash_from_value(params.get(0))?;
         let height = usize_from_value(params.get(1), "height")?;
         let (merkle, pos) = self
             .query
@@ -358,12 +372,18 @@ impl Connection {
         // TODO: return application errors should be sent to the client
         Ok(if let Err(e) = result {
             match *e.kind() {
-                ErrorKind::RpcError(ref code, ref msg) => json!({"jsonrpc": "2.0",
-                "id": id,
-                "error": {
-                    "code": *code as i32,
-                    "message": msg
-                }}),
+                ErrorKind::RpcError(ref code, _) => {
+                    // Use (at most) two errors from the error chain to produce
+                    // an error descrption.
+                    let errmsgs: Vec<String> = e.iter().take(2).map(|x| x.to_string()).collect();
+                    let errmsgs = errmsgs.join("; ");
+                    json!({"jsonrpc": "2.0",
+                    "id": id,
+                    "error": {
+                        "code": *code as i32,
+                        "message": errmsgs,
+                    }})
+                }
                 _ => {
                     warn!(
                         "rpc #{} {} {:?} failed: {}",
