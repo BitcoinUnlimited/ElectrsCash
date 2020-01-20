@@ -348,22 +348,41 @@ impl Connection {
             "server.version" => self.server_version(),
             "server.features" => self.server_features(),
             "cashaccount.query.name" => self.cashaccount_query_name(&params),
-            &_ => bail!("unknown method {} {:?}", method, params),
+            &_ => Err(ErrorKind::RpcError(
+                RpcErrorCode::MethodNotFound,
+                format!("unknown method {}", method),
+            )
+            .into()),
         };
         timer.observe_duration();
         // TODO: return application errors should be sent to the client
-        Ok(match result {
-            Ok(result) => json!({"jsonrpc": "2.0", "id": id, "result": result}),
-            Err(e) => {
-                warn!(
-                    "rpc #{} {} {:?} failed: {}",
-                    id,
-                    method,
-                    params,
-                    e.display_chain()
-                );
-                json!({"jsonrpc": "2.0", "id": id, "error": format!("{}", e)})
+        Ok(if let Err(e) = result {
+            match *e.kind() {
+                ErrorKind::RpcError(ref code, ref msg) => json!({"jsonrpc": "2.0",
+                "id": id,
+                "error": {
+                    "code": *code as i32,
+                    "message": msg
+                }}),
+                _ => {
+                    warn!(
+                        "rpc #{} {} {:?} failed: {}",
+                        id,
+                        method,
+                        params,
+                        e.display_chain()
+                    );
+
+                    json!({"jsonrpc": "2.0",
+                    "id": id,
+                    "error": {
+                        "code": RpcErrorCode::InternalError as i32,
+                        "message": e.to_string()
+                    }})
+                }
             }
+        } else {
+            json!({"jsonrpc": "2.0", "id": id, "result": result.unwrap() })
         })
     }
 
