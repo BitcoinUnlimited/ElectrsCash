@@ -4,6 +4,7 @@ use bitcoin::blockdata::transaction::{Transaction, TxIn, TxOut};
 use bitcoin::consensus::encode::{deserialize, serialize};
 use bitcoin::util::hash::BitcoinHash;
 use bitcoin_hashes::sha256d::Hash as Sha256dHash;
+use bitcoin_hashes::Hash;
 use crypto::digest::Digest;
 use crypto::sha2::Sha256;
 use std::collections::{HashMap, HashSet};
@@ -27,7 +28,7 @@ use crate::util::{
 pub struct TxInKey {
     pub code: u8,
     pub prev_hash_prefix: HashPrefix,
-    pub prev_index: u16,
+    prev_index: Vec<u8>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -42,7 +43,7 @@ impl TxInRow {
             key: TxInKey {
                 code: b'I',
                 prev_hash_prefix: hash_prefix(&input.previous_output.txid[..]),
-                prev_index: input.previous_output.vout as u16,
+                prev_index: encode_varint(input.previous_output.vout as u64),
             },
             txid_prefix: hash_prefix(&txid[..]),
         }
@@ -52,7 +53,7 @@ impl TxInRow {
         bincode::serialize(&TxInKey {
             code: b'I',
             prev_hash_prefix: hash_prefix(&txid[..]),
-            prev_index: output_index as u16,
+            prev_index: encode_varint(output_index as u64),
         })
         .unwrap()
     }
@@ -72,23 +73,37 @@ impl TxInRow {
 #[derive(Serialize, Deserialize)]
 pub struct TxOutKey {
     code: u8,
-    script_hash_prefix: HashPrefix,
+    pub script_hash_prefix: HashPrefix,
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct TxOutRow {
-    key: TxOutKey,
+    pub key: TxOutKey,
     pub txid_prefix: HashPrefix,
+    output_index: Vec<u8>,
+    output_value: Vec<u8>,
+}
+
+fn encode_varint(value: u64) -> Vec<u8> {
+    let mut buff = unsigned_varint::encode::u64_buffer();
+    let encoded = unsigned_varint::encode::u64(value, &mut buff);
+    encoded.to_vec()
+}
+
+fn decode_varint(index: &Vec<u8>) -> u64 {
+    unsigned_varint::decode::u64(&index[..]).unwrap().0
 }
 
 impl TxOutRow {
-    pub fn new(txid: &Sha256dHash, output: &TxOut) -> TxOutRow {
+    pub fn new(txid: &Sha256dHash, output: &TxOut, output_index: u64) -> TxOutRow {
         TxOutRow {
             key: TxOutKey {
                 code: b'O',
                 script_hash_prefix: hash_prefix(&compute_script_hash(&output.script_pubkey[..])),
             },
             txid_prefix: hash_prefix(&txid[..]),
+            output_index: encode_varint(output_index),
+            output_value: encode_varint(output.value),
         }
     }
 
@@ -108,7 +123,15 @@ impl TxOutRow {
     }
 
     pub fn from_row(row: &Row) -> TxOutRow {
-        bincode::deserialize(&row.key).expect("failed to parse TxOutRow")
+        bincode::deserialize(&row.key).expect("failed to parse TxOutRow key")
+    }
+
+    pub fn get_output_index(&self) -> u64 {
+        decode_varint(&self.output_index)
+    }
+
+    pub fn get_output_value(&self) -> u64 {
+        decode_varint(&self.output_value)
     }
 }
 
@@ -155,6 +178,10 @@ impl TxRow {
             height: bincode::deserialize(&row.value).expect("failed to parse height"),
         }
     }
+
+    pub fn get_txid(&self) -> Sha256dHash {
+        Sha256dHash::from_slice(&self.key.txid).unwrap()
+    }
 }
 
 #[derive(Serialize, Deserialize)]
@@ -190,7 +217,8 @@ pub fn index_transaction<'a>(
     let outputs = txn
         .output
         .iter()
-        .map(move |output| TxOutRow::new(&txid, &output).to_row());
+        .enumerate()
+        .map(move |(i, output)| TxOutRow::new(&txid, &output, i as u64).to_row());
 
     // Persist transaction ID and confirmed height
     inputs
