@@ -714,7 +714,9 @@ impl RPC {
         txid: &Sha256dHash,
         blockhash: Option<Sha256dHash>,
     ) -> Result<Vec<FullHash>> {
-        let txn = self.query.load_txn_with_blockhashlookup(txid, blockhash)?;
+        let txn = self
+            .query
+            .load_txn_with_blockhashlookup(txid, blockhash, None)?;
         let mut scripthashes = get_output_scripthash(&txn, None);
 
         for txin in txn.input {
@@ -724,7 +726,7 @@ impl RPC {
             let id: &Sha256dHash = &txin.previous_output.txid;
             let n = txin.previous_output.vout as usize;
 
-            let txn = self.query.load_txn_with_blockhashlookup(&id, None)?;
+            let txn = self.query.load_txn_with_blockhashlookup(&id, None, None)?;
             scripthashes.extend(get_output_scripthash(&txn, Some(n)));
         }
         Ok(scripthashes)

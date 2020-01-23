@@ -406,26 +406,29 @@ impl Query {
         tx_hash: &Sha256dHash,
         block_height: Option<u32>,
     ) -> Result<Option<Sha256dHash>> {
-        let blockhash = if self.tracker.read().unwrap().get_txn(&tx_hash).is_some() {
-            None // found in mempool (as unconfirmed transaction)
-        } else {
-            // Lookup in confirmed transactions' index
-            let height = match block_height {
-                Some(height) => height,
-                None => {
-                    txrow_by_txid(self.app.read_store(), &tx_hash)
-                        .chain_err(|| format!("not indexed tx {}", tx_hash))?
-                        .height
+        if self.tracker.read().unwrap().get_txn(&tx_hash).is_some() {
+            return Ok(None);
+        }
+        // Lookup in confirmed transactions' index
+        let height = match block_height {
+            Some(height) => {
+                if height == MEMPOOL_HEIGHT {
+                    return Ok(None);
                 }
-            };
-            let header = self
-                .app
-                .index()
-                .get_header(height as usize)
-                .chain_err(|| format!("missing header at height {}", height))?;
-            Some(*header.hash())
+                height
+            }
+            None => {
+                txrow_by_txid(self.app.read_store(), &tx_hash)
+                    .chain_err(|| format!("not indexed tx {}", tx_hash))?
+                    .height
+            }
         };
-        Ok(blockhash)
+        let header = self
+            .app
+            .index()
+            .get_header(height as usize)
+            .chain_err(|| format!("missing header at height {}", height))?;
+        Ok(Some(*header.hash()))
     }
 
     /// Load transaction by ID, attempt to lookup blockhash locally.
@@ -433,13 +436,14 @@ impl Query {
         &self,
         txid: &Sha256dHash,
         blockhash: Option<Sha256dHash>,
+        blockheight: Option<u32>,
     ) -> Result<Transaction> {
         if let Some(tx) = self.tracker.read().unwrap().get_txn(&txid) {
             return Ok(tx);
         }
         let hash: Option<Sha256dHash> = match blockhash {
             Some(hash) => Some(hash),
-            None => match self.lookup_confirmed_blockhash(txid, None) {
+            None => match self.lookup_confirmed_blockhash(txid, blockheight) {
                 Ok(hash) => hash,
                 Err(_) => None,
             },
