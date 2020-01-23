@@ -643,4 +643,41 @@ impl Query {
 
         Ok(json!(cashaccount_txns))
     }
+
+    /// Find first outputs to scripthash
+    pub fn scripthash_first_use(&self, scripthash: &FullHash) -> Result<(u32, Sha256dHash)> {
+        let get_tx = |store| {
+            let prefixes = txids_by_script_hash(store, scripthash);
+            let mut txs: Vec<TxRow> = prefixes
+                .iter()
+                .map(|p| txrows_by_prefix(store, *p))
+                .flatten()
+                .collect();
+
+            txs.sort_unstable_by(|a, b| a.height.cmp(&b.height));
+
+            for txrow in txs.drain(..) {
+                // verify that tx contains scripthash as output
+                let txid = Sha256dHash::from_slice(&txrow.key.txid[..]).expect("invalid txid");
+                let tx = self.load_txn_with_blockhashlookup(&txid, None, Some(txrow.height))?;
+
+                for o in tx.output.iter() {
+                    if compute_script_hash(&o.script_pubkey[..]) == *scripthash {
+                        return Ok((txrow.height, txid));
+                    }
+                }
+            }
+            Ok((0, Sha256dHash::default()))
+        };
+
+        // Look at blockchain first
+        let tx = get_tx(self.app.read_store())?;
+        if tx.0 != 0 {
+            return Ok(tx);
+        }
+
+        // No match in the blockchain, try the mempool also.
+        let tracker = self.tracker.read().unwrap();
+        get_tx(tracker.index())
+    }
 }
