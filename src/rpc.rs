@@ -327,7 +327,56 @@ impl Connection {
             Some(value) => value.as_bool().chain_err(|| "non-bool verbose value")?,
             None => false,
         };
-        Ok(self.query.get_transaction(&tx_hash, verbose)?)
+        if !verbose {
+            let tx = self.query.load_txn(&tx_hash, None, None)?;
+            Ok(json!(hex::encode(serialize(&tx))))
+        } else {
+            let header = self.query.lookup_blockheader(&tx_hash, None)?;
+            let blocktime = match header {
+                Some(ref header) => header.header().time,
+                None => 0,
+            };
+            let height = match header {
+                Some(ref header) => header.height(),
+                None => 0,
+            };
+            let confirmations = match header {
+                Some(ref header) => {
+                    if let Some(best) = self.query.best_header() {
+                        best.height() - header.height()
+                    } else {
+                        0
+                    }
+                }
+                None => 0,
+            };
+            let blockhash = header.and_then(|h| Some(h.hash().clone()));
+            let tx = self.query.load_txn(&tx_hash, blockhash.as_ref(), None)?;
+
+            let tx_serialized = serialize(&tx);
+            Ok(json!({
+                "blockhash": blockhash.unwrap_or(Sha256dHash::default()).to_hex(),
+                "blocktime": blocktime,
+                "height": height,
+                "confirmations": confirmations,
+                "hash": tx.txid().to_hex(),
+                "txid": tx.txid().to_hex(),
+                "size": tx_serialized.len(),
+                "hex": hex::encode(tx_serialized),
+                "locktime": tx.lock_time,
+                "time": blocktime,
+                "vin": tx.input.iter().map(|txin| json!({
+                    "sequence": txin.sequence,
+                    "txid": txin.previous_output.txid.to_hex(),
+                    "vout": txin.previous_output.vout,
+                    "scriptSig": txin.script_sig.to_hex(),
+                })).collect::<Vec<Value>>(),
+                "vout": tx.output.iter().map(|txout| json!({
+                    "value": txout.value,
+                    "scriptPubKey": txout.script_pubkey.to_hex()
+                })).collect::<Vec<Value>>(),
+            }))
+        }
     }
 
     fn blockchain_transaction_get_merkle(&self, params: &[Value]) -> Result<Value> {
@@ -753,11 +802,9 @@ impl RPC {
     fn get_scripthashes_effected_by_tx(
         &self,
         txid: &Sha256dHash,
-        blockhash: Option<Sha256dHash>,
+        blockhash: Option<&Sha256dHash>,
     ) -> Result<Vec<FullHash>> {
-        let txn = self
-            .query
-            .load_txn_with_blockhashlookup(txid, blockhash, None)?;
+        let txn = self.query.load_txn(txid, blockhash, None)?;
         let mut scripthashes = get_output_scripthash(&txn, None);
 
         for txin in txn.input {
@@ -767,7 +814,7 @@ impl RPC {
             let id: &Sha256dHash = &txin.previous_output.txid;
             let n = txin.previous_output.vout as usize;
 
-            let txn = self.query.load_txn_with_blockhashlookup(&id, None, None)?;
+            let txn = self.query.load_txn(&id, None, None)?;
             scripthashes.extend(get_output_scripthash(&txn, Some(n)));
         }
         Ok(scripthashes)
@@ -804,7 +851,7 @@ impl RPC {
                 }
             };
             for txid in txids {
-                insert_for_tx(txid, Some(*blockhash));
+                insert_for_tx(txid, Some(blockhash));
             }
         }
         for txid in txs_changed {

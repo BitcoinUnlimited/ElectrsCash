@@ -535,7 +535,7 @@ impl Daemon {
     pub fn gettransaction_raw(
         &self,
         txhash: &Sha256dHash,
-        blockhash: Option<Sha256dHash>,
+        blockhash: Option<&Sha256dHash>,
         verbose: bool,
     ) -> Result<Value> {
         let mut args = json!([txhash.to_hex(), verbose]);

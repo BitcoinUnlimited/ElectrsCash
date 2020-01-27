@@ -256,8 +256,7 @@ impl Query {
         for txid_prefix in prefixes {
             for tx_row in txrows_by_prefix(store, txid_prefix) {
                 let txid: Sha256dHash = deserialize(&tx_row.key.txid).unwrap();
-                let blockhash = self.lookup_confirmed_blockhash(&txid, Some(tx_row.height))?;
-                let txn = self.load_txn(&txid, blockhash)?;
+                let txn = self.load_txn(&txid, None, Some(tx_row.height))?;
                 txns.push(TxnHeight {
                     txn,
                     height: tx_row.height,
@@ -401,11 +400,11 @@ impl Query {
         Ok(Status { confirmed, mempool })
     }
 
-    fn lookup_confirmed_blockhash(
+    pub fn lookup_blockheader(
         &self,
         tx_hash: &Sha256dHash,
         block_height: Option<u32>,
-    ) -> Result<Option<Sha256dHash>> {
+    ) -> Result<Option<HeaderEntry>> {
         if self.tracker.read().unwrap().get_txn(&tx_hash).is_some() {
             return Ok(None);
         }
@@ -428,35 +427,25 @@ impl Query {
             .index()
             .get_header(height as usize)
             .chain_err(|| format!("missing header at height {}", height))?;
-        Ok(Some(*header.hash()))
+        Ok(Some(header))
     }
 
-    /// Load transaction by ID, attempt to lookup blockhash locally.
-    pub fn load_txn_with_blockhashlookup(
-        &self,
-        txid: &Sha256dHash,
-        blockhash: Option<Sha256dHash>,
-        blockheight: Option<u32>,
-    ) -> Result<Transaction> {
+    pub fn best_header(&self) -> Option<HeaderEntry> {
+        self.app.index().best_header()
+    }
+
+    fn load_txn_from_cache(&self, txid: &Sha256dHash) -> Option<Transaction> {
         if let Some(tx) = self.tracker.read().unwrap().get_txn(&txid) {
-            return Ok(tx);
+            return Some(tx);
         }
-        let hash: Option<Sha256dHash> = match blockhash {
-            Some(hash) => Some(hash),
-            None => match self.lookup_confirmed_blockhash(txid, blockheight) {
-                Ok(hash) => hash,
-                Err(_) => None,
-            },
-        };
-        self.load_txn(txid, hash)
+        self.tx_cache.get(txid)
     }
 
-    pub fn load_txn(
+    fn load_txn_from_bitcoind(
         &self,
         txid: &Sha256dHash,
-        blockhash: Option<Sha256dHash>,
+        blockhash: Option<&Sha256dHash>,
     ) -> Result<Transaction> {
-        let _timer = self.duration.with_label_values(&["load_txn"]).start_timer();
         self.tx_cache.get_or_else(&txid, || {
             let value: Value = self
                 .app
@@ -467,16 +456,26 @@ impl Query {
         })
     }
 
-    // Public API for transaction retrieval (for Electrum RPC)
-    pub fn get_transaction(&self, tx_hash: &Sha256dHash, verbose: bool) -> Result<Value> {
-        let _timer = self
-            .duration
-            .with_label_values(&["get_transaction"])
-            .start_timer();
-        let blockhash = self.lookup_confirmed_blockhash(tx_hash, /*block_height*/ None)?;
-        self.app
-            .daemon()
-            .gettransaction_raw(tx_hash, blockhash, verbose)
+    pub fn load_txn(
+        &self,
+        txid: &Sha256dHash,
+        blockhash: Option<&Sha256dHash>,
+        blockheight: Option<u32>,
+    ) -> Result<Transaction> {
+        let _timer = self.duration.with_label_values(&["load_txn"]).start_timer();
+        if let Some(tx) = self.load_txn_from_cache(txid) {
+            return Ok(tx);
+        }
+
+        let hash: Option<Sha256dHash> = match blockhash {
+            Some(hash) => Some(*hash),
+            None => match self.lookup_blockheader(txid, blockheight) {
+                Ok(header) => header.and_then(|h| Some(h.hash().clone())),
+                Err(_) => None,
+            },
+        };
+
+        self.load_txn_from_bitcoind(txid, hash.as_ref())
     }
 
     pub fn get_headers(&self, heights: &[usize]) -> Vec<HeaderEntry> {
@@ -659,7 +658,7 @@ impl Query {
             for txrow in txs.drain(..) {
                 // verify that tx contains scripthash as output
                 let txid = Sha256dHash::from_slice(&txrow.key.txid[..]).expect("invalid txid");
-                let tx = self.load_txn_with_blockhashlookup(&txid, None, Some(txrow.height))?;
+                let tx = self.load_txn(&txid, None, Some(txrow.height))?;
 
                 for o in tx.output.iter() {
                     if compute_script_hash(&o.script_pubkey[..]) == *scripthash {
