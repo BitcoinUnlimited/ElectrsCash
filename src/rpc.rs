@@ -679,14 +679,14 @@ impl RPC {
                     Notification::ScriptHashChange(hash) => {
                         for (i, sender) in senders.iter() {
                             if let Err(e) = sender.try_send(Message::ScriptHashChange(hash)) {
-                                warn!("failed to send ScriptHashChange to peer {}: {}", i, e);
+                                debug!("failed to send ScriptHashChange to peer {}: {}", i, e);
                             }
                         }
                     }
                     Notification::ChainTipChange(hash) => {
                         for (i, sender) in senders.iter() {
                             if let Err(e) = sender.try_send(Message::ChainTipChange(hash.clone())) {
-                                warn!("failed to send ChainTipChange to peer {}: {}", i, e);
+                                debug!("failed to send ChainTipChange to peer {}: {}", i, e);
                             }
                         }
                     }
