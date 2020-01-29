@@ -132,11 +132,8 @@ impl TransactionCache {
     where
         F: FnOnce() -> Result<Vec<u8>>,
     {
-        match self.map.lock().unwrap().get(txid) {
-            Some(serialized_txn) => {
-                return Ok(deserialize(&serialized_txn).chain_err(|| "failed to parse cached tx")?);
-            }
-            None => {}
+        if let Some(txn) = self.get(txid) {
+            return Ok(txn);
         }
         let serialized_txn = load_txn_func()?;
         let txn = deserialize(&serialized_txn).chain_err(|| "failed to parse serialized tx")?;
@@ -146,6 +143,17 @@ impl TransactionCache {
             .unwrap()
             .put(*txid, serialized_txn, byte_size);
         Ok(txn)
+    }
+
+    pub fn get(&self, txid: &Sha256dHash) -> Option<Transaction> {
+        if let Some(serialized_txn) = self.map.lock().unwrap().get(txid) {
+            if let Ok(tx) = deserialize(&serialized_txn) {
+                return Some(tx);
+            } else {
+                trace!("failed to parse a cached tx");
+            }
+        }
+        None
     }
 }
 
