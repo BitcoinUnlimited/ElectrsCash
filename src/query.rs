@@ -371,8 +371,7 @@ impl Query {
             return Ok(txrows.remove(0));
         }
         for txrow in txrows {
-            let tx =
-                self.load_txn_with_blockhashlookup(&txrow.get_txid(), None, Some(txrow.height))?;
+            let tx = self.load_txn(&txrow.get_txid(), None, Some(txrow.height))?;
             if txn_has_output(&tx, txout.get_output_index(), &txout.key.script_hash_prefix) {
                 return Ok(txrow);
             }
