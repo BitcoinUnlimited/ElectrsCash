@@ -740,4 +740,8 @@ impl Query {
         let tracker = self.tracker.read().unwrap();
         get_tx(tracker.index())
     }
+
+    pub fn get_relayfee(&self) -> Result<f64> {
+        self.app.daemon().get_relayfee()
+    }
 }
