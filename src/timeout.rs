@@ -1,7 +1,7 @@
 use crate::errors::*;
 use std::time::{Duration, Instant};
 
-struct TimeoutTrigger {
+pub struct TimeoutTrigger {
     start: Instant,
     timeout: Duration,
 }
@@ -16,7 +16,7 @@ impl TimeoutTrigger {
 
     pub fn check(&self) -> Result<()> {
         if self.start.elapsed() >= self.timeout {
-            return Err("Timeout".into());
+            return Err(ErrorKind::RpcError(RpcErrorCode::Timeout, "Timeout".into()).into());
         }
         Ok(())
     }
