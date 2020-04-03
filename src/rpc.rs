@@ -104,6 +104,7 @@ struct Connection {
     addr: SocketAddr,
     chan: SyncChannel<Message>,
     stats: Arc<Stats>,
+    relayfee: f64,
 }
 
 impl Connection {
@@ -112,6 +113,7 @@ impl Connection {
         stream: TcpStream,
         addr: SocketAddr,
         stats: Arc<Stats>,
+        relayfee: f64,
     ) -> Connection {
         Connection {
             query,
@@ -121,6 +123,7 @@ impl Connection {
             addr,
             chan: SyncChannel::new(10),
             stats,
+            relayfee,
         }
     }
 
@@ -230,11 +233,11 @@ impl Connection {
     fn blockchain_estimatefee(&self, params: &[Value]) -> Result<Value> {
         let blocks_count = usize_from_value(params.get(0), "blocks_count")?;
         let fee_rate = self.query.estimate_fee(blocks_count); // in BTC/kB
-        Ok(json!(fee_rate))
+        Ok(json!(fee_rate.max(self.relayfee)))
     }
 
     fn blockchain_relayfee(&self) -> Result<Value> {
-        Ok(json!(0.0)) // allow sending transactions with any fee.
+        Ok(json!(self.relayfee)) // in BTC/kB
     }
 
     fn blockchain_scripthash_subscribe(&mut self, params: &[Value]) -> Result<Value> {
@@ -679,14 +682,14 @@ impl RPC {
                     Notification::ScriptHashChange(hash) => {
                         for (i, sender) in senders.iter() {
                             if let Err(e) = sender.try_send(Message::ScriptHashChange(hash)) {
-                                warn!("failed to send ScriptHashChange to peer {}: {}", i, e);
+                                debug!("failed to send ScriptHashChange to peer {}: {}", i, e);
                             }
                         }
                     }
                     Notification::ChainTipChange(hash) => {
                         for (i, sender) in senders.iter() {
                             if let Err(e) = sender.try_send(Message::ChainTipChange(hash.clone())) {
-                                warn!("failed to send ChainTipChange to peer {}: {}", i, e);
+                                debug!("failed to send ChainTipChange to peer {}: {}", i, e);
                             }
                         }
                     }
@@ -717,7 +720,7 @@ impl RPC {
         chan
     }
 
-    pub fn start(addr: SocketAddr, query: Arc<Query>, metrics: &Metrics) -> RPC {
+    pub fn start(addr: SocketAddr, query: Arc<Query>, metrics: &Metrics, relayfee: f64) -> RPC {
         let stats = Arc::new(Stats {
             latency: metrics.histogram_vec(
                 HistogramOpts::new("electrscash_electrum_rpc", "Electrum RPC latency (seconds)"),
@@ -755,7 +758,7 @@ impl RPC {
 
                         spawn_thread("peer", move || {
                             info!("[{}] connected peer #{}", addr, handle_id);
-                            let conn = Connection::new(query, stream, addr, stats);
+                            let conn = Connection::new(query, stream, addr, stats, relayfee);
                             senders
                                 .lock()
                                 .unwrap()
