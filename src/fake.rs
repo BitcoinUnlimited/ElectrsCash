@@ -13,7 +13,7 @@ impl ReadStore for FakeStore {
 }
 
 impl WriteStore for FakeStore {
-    fn write<I: IntoIterator<Item = Row>>(&self, _rows: I) {}
+    fn write<I: IntoIterator<Item = Row>>(&self, _rows: I, _sync: bool) {}
     fn flush(&self) {}
 }
 
@@ -25,10 +25,13 @@ mod tests {
         use crate::store::{ReadStore, Row, WriteStore};
 
         let store = fake::FakeStore {};
-        store.write(vec![Row {
-            key: b"k".to_vec(),
-            value: b"v".to_vec(),
-        }]);
+        store.write(
+            vec![Row {
+                key: b"k".to_vec(),
+                value: b"v".to_vec(),
+            }],
+            true,
+        );
         store.flush();
         // nothing was actually written
         assert!(store.get(b"").is_none());
