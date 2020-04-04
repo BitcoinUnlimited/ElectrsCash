@@ -138,6 +138,7 @@ pub struct Config {
     pub server_banner: String,
     pub blocktxids_cache_size: usize,
     pub cookie_getter: Arc<dyn CookieGetter>,
+    pub rpc_timeout: u16,
 }
 
 /// Returns default daemon directory
@@ -269,6 +270,7 @@ impl Config {
             txid_limit: config.txid_limit,
             server_banner: config.server_banner,
             cookie_getter,
+            rpc_timeout: config.rpc_timeout as u16,
         };
         eprintln!("{:?}", config);
         config

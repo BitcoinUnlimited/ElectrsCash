@@ -7,6 +7,7 @@ pub enum RpcErrorCode {
     InternalError = -32603,
     Other = -32000, /* Range -32000 to -32099 is serve defined */
     NotFound = -32004,
+    Timeout = -32005,
 }
 
 error_chain! {

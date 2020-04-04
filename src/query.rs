@@ -17,6 +17,7 @@ use crate::index::{compute_script_hash, TxInRow, TxOutRow, TxRow};
 use crate::mempool::{Tracker, MEMPOOL_HEIGHT};
 use crate::metrics::{HistogramOpts, HistogramVec, Metrics};
 use crate::store::{ReadStore, Row};
+use crate::timeout::TimeoutTrigger;
 use crate::util::{hash_prefix, FullHash, HashPrefix, HeaderEntry};
 
 enum ConfirmationState {
@@ -279,6 +280,7 @@ impl Query {
         &self,
         store: &dyn ReadStore,
         funding: &FundingOutput,
+        timeout: &TimeoutTrigger,
     ) -> Result<Option<SpendingInput>> {
         let spending_txns = txids_by_funding_output(store, &funding.txn_id, funding.output_index);
 
@@ -318,6 +320,7 @@ impl Query {
                     })
                 }
             }
+            timeout.check()?;
         }
         assert!(spending_inputs.len() <= 1);
         Ok(if spending_inputs.len() == 1 {
@@ -382,10 +385,12 @@ impl Query {
     fn confirmed_status(
         &self,
         script_hash: &[u8],
+        timeout: &TimeoutTrigger,
     ) -> Result<(Vec<FundingOutput>, Vec<SpendingInput>)> {
         let mut spending = vec![];
         let read_store = self.app.read_store();
         let funding = txoutrows_by_script_hash(read_store, script_hash);
+        timeout.check()?;
         let funding: Result<Vec<FundingOutput>> = funding
             .iter()
             .map(|outrow| self.txoutrow_to_fundingoutput(read_store, outrow))
@@ -405,7 +410,8 @@ impl Query {
         }
 
         for funding_output in &funding {
-            if let Some(spent) = self.find_spending_input(read_store, &funding_output)? {
+            timeout.check()?;
+            if let Some(spent) = self.find_spending_input(read_store, &funding_output, timeout)? {
                 spending.push(spent);
             }
         }
@@ -416,6 +422,7 @@ impl Query {
         &self,
         script_hash: &[u8],
         confirmed_funding: &[FundingOutput],
+        timeout: &TimeoutTrigger,
     ) -> Result<(Vec<FundingOutput>, Vec<SpendingInput>)> {
         let mut spending = vec![];
         let tracker = self.tracker.read().unwrap();
@@ -432,20 +439,23 @@ impl Query {
 
         // // TODO: dedup outputs (somehow) both confirmed and in mempool (e.g. reorg?)
         for funding_output in funding.iter().chain(confirmed_funding.iter()) {
-            if let Some(spent) = self.find_spending_input(tracker.index(), &funding_output)? {
+            timeout.check()?;
+            if let Some(spent) =
+                self.find_spending_input(tracker.index(), &funding_output, timeout)?
+            {
                 spending.push(spent);
             }
         }
         Ok((funding, spending))
     }
 
-    pub fn status(&self, script_hash: &[u8]) -> Result<Status> {
+    pub fn status(&self, script_hash: &[u8], timeout: &TimeoutTrigger) -> Result<Status> {
         let timer = self
             .duration
             .with_label_values(&["confirmed_status"])
             .start_timer();
         let confirmed = self
-            .confirmed_status(script_hash)
+            .confirmed_status(script_hash, timeout)
             .chain_err(|| "failed to get confirmed status")?;
         timer.observe_duration();
 
@@ -454,7 +464,7 @@ impl Query {
             .with_label_values(&["mempool_status"])
             .start_timer();
         let mempool = self
-            .mempool_status(script_hash, &confirmed.0)
+            .mempool_status(script_hash, &confirmed.0, timeout)
             .chain_err(|| "failed to get mempool status")?;
         timer.observe_duration();
 

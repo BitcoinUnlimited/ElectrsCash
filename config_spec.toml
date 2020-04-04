@@ -111,3 +111,9 @@ name = "server_banner"
 type = "String"
 doc = "The banner to be shown in the Electrum console"
 default = "concat!(\"Welcome to ElectrsCash \", env!(\"CARGO_PKG_VERSION\"), \" (Electrum Rust Server)!\").to_owned()"
+
+[[param]]
+name = "rpc_timeout"
+type = "usize"
+doc = "Maximum time in seconds an RPC call may make. Mitigates DoS when querying 'too popular' addresses"
+default = "10"

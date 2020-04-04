@@ -12,12 +12,14 @@ use std::net::{Shutdown, SocketAddr, TcpListener, TcpStream};
 use std::sync::mpsc::{Sender, SyncSender};
 use std::sync::{Arc, Mutex};
 use std::thread;
+use std::time::Duration;
 
 use crate::errors::*;
 use crate::index::compute_script_hash;
 use crate::mempool::MEMPOOL_HEIGHT;
 use crate::metrics::{Gauge, HistogramOpts, HistogramVec, MetricOpts, Metrics};
 use crate::query::{Query, Status};
+use crate::timeout::TimeoutTrigger;
 use crate::util::FullHash;
 use crate::util::{spawn_thread, Channel, HeaderEntry, SyncChannel};
 
@@ -105,6 +107,7 @@ struct Connection {
     chan: SyncChannel<Message>,
     stats: Arc<Stats>,
     relayfee: f64,
+    rpc_timeout: u16,
 }
 
 impl Connection {
@@ -114,6 +117,7 @@ impl Connection {
         addr: SocketAddr,
         stats: Arc<Stats>,
         relayfee: f64,
+        rpc_timeout: u16,
     ) -> Connection {
         Connection {
             query,
@@ -124,6 +128,7 @@ impl Connection {
             chan: SyncChannel::new(10),
             stats,
             relayfee,
+            rpc_timeout,
         }
     }
 
@@ -240,9 +245,13 @@ impl Connection {
         Ok(json!(self.relayfee)) // in BTC/kB
     }
 
-    fn blockchain_scripthash_subscribe(&mut self, params: &[Value]) -> Result<Value> {
+    fn blockchain_scripthash_subscribe(
+        &mut self,
+        params: &[Value],
+        timeout: &TimeoutTrigger,
+    ) -> Result<Value> {
         let script_hash = hash_from_value(params.get(0)).chain_err(|| "bad script_hash")?;
-        let status = self.query.status(&script_hash[..])?;
+        let status = self.query.status(&script_hash[..], timeout)?;
         let result = status.hash().map_or(Value::Null, |h| json!(hex::encode(h)));
         self.status_hashes.insert(script_hash, result.clone());
         self.stats
@@ -251,17 +260,25 @@ impl Connection {
         Ok(result)
     }
 
-    fn blockchain_scripthash_get_balance(&self, params: &[Value]) -> Result<Value> {
+    fn blockchain_scripthash_get_balance(
+        &self,
+        params: &[Value],
+        timeout: &TimeoutTrigger,
+    ) -> Result<Value> {
         let script_hash = hash_from_value(params.get(0))?;
-        let status = self.query.status(&script_hash[..])?;
+        let status = self.query.status(&script_hash[..], timeout)?;
         Ok(
             json!({ "confirmed": status.confirmed_balance(), "unconfirmed": status.mempool_balance() }),
         )
     }
 
-    fn blockchain_scripthash_get_history(&self, params: &[Value]) -> Result<Value> {
+    fn blockchain_scripthash_get_history(
+        &self,
+        params: &[Value],
+        timeout: &TimeoutTrigger,
+    ) -> Result<Value> {
         let script_hash = hash_from_value(params.get(0))?;
-        let status = self.query.status(&script_hash[..])?;
+        let status = self.query.status(&script_hash[..], timeout)?;
         Ok(json!(Value::Array(
             status
                 .history()
@@ -271,9 +288,15 @@ impl Connection {
         )))
     }
 
-    fn blockchain_scripthash_listunspent(&self, params: &[Value]) -> Result<Value> {
+    fn blockchain_scripthash_listunspent(
+        &self,
+        params: &[Value],
+        timeout: &TimeoutTrigger,
+    ) -> Result<Value> {
         let script_hash = hash_from_value(params.get(0))?;
-        Ok(unspent_from_status(&self.query.status(&script_hash[..])?))
+        Ok(unspent_from_status(
+            &self.query.status(&script_hash[..], timeout)?,
+        ))
     }
 
     fn blockchain_scripthash_get_first_use(&self, params: &[Value]) -> Result<Value> {
@@ -428,16 +451,25 @@ impl Connection {
             .latency
             .with_label_values(&[method])
             .start_timer();
+        let timeout = TimeoutTrigger::new(Duration::from_secs(self.rpc_timeout as u64));
         let result = match method {
             "blockchain.block.header" => self.blockchain_block_header(&params),
             "blockchain.block.headers" => self.blockchain_block_headers(&params),
             "blockchain.estimatefee" => self.blockchain_estimatefee(&params),
             "blockchain.headers.subscribe" => self.blockchain_headers_subscribe(),
             "blockchain.relayfee" => self.blockchain_relayfee(),
-            "blockchain.scripthash.get_balance" => self.blockchain_scripthash_get_balance(&params),
-            "blockchain.scripthash.get_history" => self.blockchain_scripthash_get_history(&params),
-            "blockchain.scripthash.listunspent" => self.blockchain_scripthash_listunspent(&params),
-            "blockchain.scripthash.subscribe" => self.blockchain_scripthash_subscribe(&params),
+            "blockchain.scripthash.get_balance" => {
+                self.blockchain_scripthash_get_balance(&params, &timeout)
+            }
+            "blockchain.scripthash.get_history" => {
+                self.blockchain_scripthash_get_history(&params, &timeout)
+            }
+            "blockchain.scripthash.listunspent" => {
+                self.blockchain_scripthash_listunspent(&params, &timeout)
+            }
+            "blockchain.scripthash.subscribe" => {
+                self.blockchain_scripthash_subscribe(&params, &timeout)
+            }
             "blockchain.scripthash.get_first_use" => {
                 self.blockchain_scripthash_get_first_use(&params)
             }
@@ -518,7 +550,8 @@ impl Connection {
             .with_label_values(&["statushash_update"])
             .start_timer();
 
-        let status = self.query.status(&scripthash[..])?;
+        let timeout = TimeoutTrigger::new(Duration::from_secs(self.rpc_timeout as u64));
+        let status = self.query.status(&scripthash[..], &timeout)?;
         let new_statushash = status.hash().map_or(Value::Null, |h| json!(hex::encode(h)));
         if new_statushash == *old_statushash {
             return Ok(());
@@ -720,7 +753,13 @@ impl RPC {
         chan
     }
 
-    pub fn start(addr: SocketAddr, query: Arc<Query>, metrics: &Metrics, relayfee: f64) -> RPC {
+    pub fn start(
+        addr: SocketAddr,
+        query: Arc<Query>,
+        metrics: &Metrics,
+        relayfee: f64,
+        rpc_timeout: u16,
+    ) -> RPC {
         let stats = Arc::new(Stats {
             latency: metrics.histogram_vec(
                 HistogramOpts::new("electrscash_electrum_rpc", "Electrum RPC latency (seconds)"),
@@ -758,7 +797,8 @@ impl RPC {
 
                         spawn_thread("peer", move || {
                             info!("[{}] connected peer #{}", addr, handle_id);
-                            let conn = Connection::new(query, stream, addr, stats, relayfee);
+                            let conn =
+                                Connection::new(query, stream, addr, stats, relayfee, rpc_timeout);
                             senders
                                 .lock()
                                 .unwrap()
