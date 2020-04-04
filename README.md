@@ -31,7 +31,7 @@ thus preserving the privacy of the user's addresses and balances.
  * [CashAccount support](https://honest.cash/v2/dagur/fast-cashaccount-lookups-using-bitbox-and-electrum-4781)
  * Supports major Bitcoin Cash full nodes, in addition to [full integration with Bitcoin Unlimited](https://github.com/BitcoinUnlimited/BitcoinUnlimited/blob/release/doc/bu-electrum-integration.md)
  * Deterministic builds
- * [Integration tests with](doc/integration-tests.md) `bitcoind` in regtest
+ * Its the only electrum server with good integration tests coverage
 
 ## Usage
 
@@ -40,3 +40,13 @@ See [here](doc/usage.md) for installation, build and usage instructions.
 ## Index database
 
 The database schema is described [here](doc/schema.md).
+
+## Tests
+
+Run unit tests with `cargo test`.
+
+Integration tests are included in the [Bitcoin Unlimited test set](https://github.com/BitcoinUnlimited/BitcoinUnlimited/tree/dev/qa/rpc-tests). Look for tests prefixed with `electrum_`.
+
+To run the tests, you need to:
+- [Clone and build Bitcoin Unlimited](https://github.com/BitcoinUnlimited/BitcoinUnlimited/blob/release/doc/build-unix.md).
+- run `./contrib/run_functional_tests.sh`.
