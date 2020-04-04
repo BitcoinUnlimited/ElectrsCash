@@ -40,7 +40,7 @@ fn run_server(config: &Config) -> Result<()> {
         &metrics,
     )?;
     // Perform initial indexing from local blk*.dat block files.
-    let store = DBStore::open(&config.db_path, /*low_memory=*/ config.jsonrpc_import);
+    let store = DBStore::open(&config.db_path, config.low_memory);
     let index = Index::load(&store, &daemon, &metrics, config.index_batch_size)?;
     let store = if is_fully_compacted(&store) {
         store // initial import and full compaction are over
