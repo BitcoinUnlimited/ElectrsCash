@@ -24,7 +24,8 @@ use crate::util::FullHash;
 use crate::util::{spawn_thread, Channel, HeaderEntry, SyncChannel};
 
 const ELECTRSCASH_VERSION: &str = env!("CARGO_PKG_VERSION");
-const PROTOCOL_VERSION: &str = "1.4";
+const PROTOCOL_VERSION_MIN: &str = "1.4";
+const PROTOCOL_VERSION_MAX: &str = "1.4.1";
 const PROTOCOL_HASH_FUNCTION: &str = "sha256";
 
 fn rpc_arg_error(what: &str) -> ErrorKind {
@@ -143,7 +144,7 @@ impl Connection {
     fn server_version(&self) -> Result<Value> {
         Ok(json!([
             format!("ElectrsCash {}", ELECTRSCASH_VERSION),
-            PROTOCOL_VERSION
+            [PROTOCOL_VERSION_MIN, PROTOCOL_VERSION_MAX]
         ]))
     }
 
@@ -164,8 +165,8 @@ impl Connection {
         Ok(json!({
             "genesis_hash" : genesis_header.hash().to_hex(),
             "hash_function": PROTOCOL_HASH_FUNCTION,
-            "protocol_max": PROTOCOL_VERSION,
-            "protocol_min": PROTOCOL_VERSION,
+            "protocol_max": PROTOCOL_VERSION_MAX,
+            "protocol_min": PROTOCOL_VERSION_MIN,
             "server_version": format!("ElectrsCash {}", ELECTRSCASH_VERSION),
             "firstuse": ["1.0"]
         }))
@@ -740,7 +741,7 @@ impl RPC {
                 TcpListener::bind(addr).unwrap_or_else(|e| panic!("bind({}) failed: {}", addr, e));
             info!(
                 "Electrum RPC server running on {} (protocol {})",
-                addr, PROTOCOL_VERSION
+                addr, PROTOCOL_VERSION_MAX
             );
             loop {
                 let (stream, addr) = listener.accept().expect("accept failed");
