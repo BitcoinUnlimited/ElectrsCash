@@ -41,7 +41,13 @@ fn run_server(config: &Config) -> Result<()> {
     )?;
     // Perform initial indexing from local blk*.dat block files.
     let store = DBStore::open(&config.db_path, config.low_memory);
-    let index = Index::load(&store, &daemon, &metrics, config.index_batch_size)?;
+    let index = Index::load(
+        &store,
+        &daemon,
+        &metrics,
+        config.index_batch_size,
+        config.cashaccount_activation_height,
+    )?;
     let store = if is_fully_compacted(&store) {
         store // initial import and full compaction are over
     } else if config.jsonrpc_import {
@@ -49,8 +55,14 @@ fn run_server(config: &Config) -> Result<()> {
         full_compaction(store)
     } else {
         // faster, but uses more memory
-        let store =
-            bulk::index_blk_files(&daemon, config.bulk_index_threads, &metrics, &signal, store)?;
+        let store = bulk::index_blk_files(
+            &daemon,
+            config.bulk_index_threads,
+            &metrics,
+            &signal,
+            store,
+            config.cashaccount_activation_height,
+        )?;
         let store = full_compaction(store);
         index.reload(&store); // make sure the block header index is up-to-date
         store

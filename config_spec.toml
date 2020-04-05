@@ -123,3 +123,9 @@ default = "10"
 name = "low_memory"
 doc = "Indicate preference to less memory usage over performance"
 default = false
+
+[[param]]
+name = "cashaccount_activation_height"
+type = "usize"
+doc = "The activation blockheight for cashaccount. Set to 0 to disable cashaccount indexing"
+default = "563720"

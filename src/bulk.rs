@@ -13,6 +13,7 @@ use std::sync::{
 };
 use std::thread;
 
+use crate::cashaccount::CashAccountParser;
 use crate::daemon::Daemon;
 use crate::errors::*;
 use crate::index::{index_block, last_indexed_block, read_indexed_blockhashes};
@@ -25,6 +26,7 @@ struct Parser {
     magic: u32,
     current_headers: HeaderList,
     indexed_blockhashes: Mutex<HashSet<Sha256dHash>>,
+    cashaccount_activation_height: u32,
     // metrics
     duration: HistogramVec,
     block_count: CounterVec,
@@ -36,11 +38,13 @@ impl Parser {
         daemon: &Daemon,
         metrics: &Metrics,
         indexed_blockhashes: HashSet<Sha256dHash>,
+        cashaccount_activation_height: u32,
     ) -> Result<Arc<Parser>> {
         Ok(Arc::new(Parser {
             magic: daemon.magic(),
             current_headers: load_headers(daemon)?,
             indexed_blockhashes: Mutex::new(indexed_blockhashes),
+            cashaccount_activation_height,
             duration: metrics.histogram_vec(
                 HistogramOpts::new(
                     "electrscash_parse_duration",
@@ -91,6 +95,7 @@ impl Parser {
 
         let mut rows = Vec::<Row>::new();
         let timer = self.duration.with_label_values(&["index"]).start_timer();
+        let cashaccount = CashAccountParser::new(Some(self.cashaccount_activation_height));
         for block in blocks {
             let blockhash = block.bitcoin_hash();
             if let Some(header) = self.current_headers.header_by_blockhash(&blockhash) {
@@ -100,7 +105,7 @@ impl Parser {
                     .expect("indexed_blockhashes")
                     .insert(blockhash)
                 {
-                    rows.extend(index_block(&block, header.height()));
+                    rows.extend(index_block(&block, header.height(), &cashaccount));
                     self.block_count.with_label_values(&["indexed"]).inc();
                 } else {
                     self.block_count.with_label_values(&["duplicate"]).inc();
@@ -231,13 +236,19 @@ pub fn index_blk_files(
     metrics: &Metrics,
     signal: &Waiter,
     store: DBStore,
+    cashaccount_activation_height: u32,
 ) -> Result<DBStore> {
     set_open_files_limit(2048); // twice the default `ulimit -n` value
     let blk_files = daemon.list_blk_files()?;
     info!("indexing {} blk*.dat files", blk_files.len());
     let indexed_blockhashes = read_indexed_blockhashes(&store);
     debug!("found {} indexed blocks", indexed_blockhashes.len());
-    let parser = Parser::new(daemon, metrics, indexed_blockhashes)?;
+    let parser = Parser::new(
+        daemon,
+        metrics,
+        indexed_blockhashes,
+        cashaccount_activation_height,
+    )?;
     let (blobs, reader) = start_reader(blk_files, parser.clone());
     let rows_chan = SyncChannel::new(0);
     let indexers: Vec<JoinHandle> = (0..index_threads)
