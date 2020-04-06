@@ -14,6 +14,9 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
+use crate::def::{
+    ELECTRSCASH_VERSION, PROTOCOL_HASH_FUNCTION, PROTOCOL_VERSION_MAX, PROTOCOL_VERSION_MIN,
+};
 use crate::errors::*;
 use crate::index::compute_script_hash;
 use crate::mempool::MEMPOOL_HEIGHT;
@@ -22,11 +25,6 @@ use crate::query::{Query, Status};
 use crate::timeout::TimeoutTrigger;
 use crate::util::FullHash;
 use crate::util::{spawn_thread, Channel, HeaderEntry, SyncChannel};
-
-const ELECTRSCASH_VERSION: &str = env!("CARGO_PKG_VERSION");
-const PROTOCOL_VERSION_MIN: &str = "1.4";
-const PROTOCOL_VERSION_MAX: &str = "1.4.1";
-const PROTOCOL_HASH_FUNCTION: &str = "sha256";
 
 fn rpc_arg_error(what: &str) -> ErrorKind {
     ErrorKind::RpcError(RpcErrorCode::InvalidParams, what.to_string())

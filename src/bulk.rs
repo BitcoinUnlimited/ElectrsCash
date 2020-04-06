@@ -258,7 +258,7 @@ pub fn index_blk_files(
     spawn_thread("bulk_writer", move || -> Result<DBStore> {
         for (rows, path) in rows_chan.into_receiver() {
             trace!("indexed {:?}: {} rows", path, rows.len());
-            store.write(rows);
+            store.write(rows, false);
             signal
                 .poll()
                 .chain_err(|| "stopping bulk indexing due to signal")?;
@@ -273,7 +273,7 @@ pub fn index_blk_files(
                 .expect("indexer panicked")
                 .expect("indexing failed")
         });
-        store.write(vec![parser.last_indexed_row()]);
+        store.write(vec![parser.last_indexed_row()], true);
         Ok(store)
     })
     .join()

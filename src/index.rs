@@ -472,7 +472,7 @@ impl Index {
             });
 
             let timer = self.stats.start_timer("index+write");
-            store.write(rows_iter);
+            store.write(rows_iter, false);
             timer.observe_duration();
         }
         let timer = self.stats.start_timer("flush");

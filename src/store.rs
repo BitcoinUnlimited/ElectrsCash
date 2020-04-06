@@ -1,6 +1,8 @@
 use rocksdb;
 use std::path::{Path, PathBuf};
+use std::str::from_utf8;
 
+use crate::def::DATABASE_VERSION;
 use crate::util::Bytes;
 
 #[derive(Clone)]
@@ -21,7 +23,7 @@ pub trait ReadStore: Sync {
 }
 
 pub trait WriteStore: Sync {
-    fn write<I: IntoIterator<Item = Row>>(&self, rows: I);
+    fn write<I: IntoIterator<Item = Row>>(&self, rows: I, sync: bool);
     fn flush(&self);
 }
 
@@ -54,12 +56,19 @@ impl DBStore {
             db_opts.set_compaction_readahead_size(1 << 20);
         }
 
+        let is_new_db = !opts.path.exists();
+
         let mut block_opts = rocksdb::BlockBasedOptions::default();
         block_opts.set_block_size(if opts.low_memory { 256 << 10 } else { 1 << 20 });
-        DBStore {
+        let store = DBStore {
             db: rocksdb::DB::open(&db_opts, &opts.path).unwrap(),
             opts,
+        };
+        if is_new_db {
+            store.write(vec![version_marker()], true);
+            store.flush();
         }
+        store
     }
 
     /// Opens a new RocksDB at the specified location.
@@ -94,6 +103,13 @@ impl DBStore {
             prefix: prefix.to_vec(),
             iter: self.db.prefix_iterator(prefix),
             done: false,
+        }
+    }
+
+    pub fn destroy(path: &Path) {
+        match rocksdb::DB::destroy(&rocksdb::Options::default(), path) {
+            Ok(_) => debug!("Database destroyed"),
+            Err(err) => info!("Clould not destory database: {}", err),
         }
     }
 }
@@ -148,14 +164,14 @@ impl ReadStore for DBStore {
 }
 
 impl WriteStore for DBStore {
-    fn write<I: IntoIterator<Item = Row>>(&self, rows: I) {
+    fn write<I: IntoIterator<Item = Row>>(&self, rows: I, sync: bool) {
         let mut batch = rocksdb::WriteBatch::default();
         for row in rows {
             batch.put(row.key.as_slice(), row.value.as_slice()).unwrap();
         }
         let mut opts = rocksdb::WriteOptions::new();
-        opts.set_sync(!self.opts.bulk_import);
-        opts.disable_wal(self.opts.bulk_import);
+        opts.set_sync(sync);
+        opts.disable_wal(!sync);
         self.db.write_opt(batch, &opts).unwrap();
     }
 
@@ -181,10 +197,28 @@ fn full_compaction_marker() -> Row {
     }
 }
 
+pub fn version_marker() -> Row {
+    Row {
+        key: b"VER".to_vec(),
+        value: DATABASE_VERSION.into(),
+    }
+}
+
+pub fn is_compatible_version(store: &dyn ReadStore) -> bool {
+    let version = store.get(&version_marker().key);
+    match version {
+        Some(v) => match from_utf8(&v) {
+            Ok(v) => v == DATABASE_VERSION,
+            Err(_) => false,
+        },
+        None => false,
+    }
+}
+
 pub fn full_compaction(store: DBStore) -> DBStore {
     store.flush();
     let store = store.compact().enable_compaction();
-    store.write(vec![full_compaction_marker()]);
+    store.write(vec![full_compaction_marker()], true);
     store
 }
 

@@ -21,7 +21,7 @@ use electrscash::{
     query::Query,
     rpc::RPC,
     signal::Waiter,
-    store::{full_compaction, is_fully_compacted, DBStore},
+    store::{full_compaction, is_compatible_version, is_fully_compacted, DBStore},
 };
 
 fn run_server(config: &Config) -> Result<()> {
@@ -39,7 +39,16 @@ fn run_server(config: &Config) -> Result<()> {
         blocktxids_cache,
         &metrics,
     )?;
-    // Perform initial indexing from local blk*.dat block files.
+    // Perform initial indexing.
+    let compatible = {
+        let store = DBStore::open(&config.db_path, config.low_memory);
+        is_compatible_version(&store)
+    };
+
+    if !compatible {
+        info!("Incompatible database. Running full reindex.");
+        DBStore::destroy(&config.db_path);
+    }
     let store = DBStore::open(&config.db_path, config.low_memory);
     let index = Index::load(
         &store,
@@ -51,7 +60,9 @@ fn run_server(config: &Config) -> Result<()> {
     let store = if is_fully_compacted(&store) {
         store // initial import and full compaction are over
     } else if config.jsonrpc_import {
-        index.update(&store, &signal)?; // slower: uses JSONRPC for fetching blocks
+        // slower: uses JSONRPC for fetching blocks
+        index.reload(&store); // load headers
+        index.update(&store, &signal)?;
         full_compaction(store)
     } else {
         // faster, but uses more memory
