@@ -140,6 +140,7 @@ pub struct Config {
     pub cookie_getter: Arc<dyn CookieGetter>,
     pub rpc_timeout: u16,
     pub low_memory: bool,
+    pub cashaccount_activation_height: u32,
 }
 
 /// Returns default daemon directory
@@ -273,6 +274,7 @@ impl Config {
             cookie_getter,
             rpc_timeout: config.rpc_timeout as u16,
             low_memory: config.low_memory,
+            cashaccount_activation_height: config.cashaccount_activation_height as u32,
         };
         eprintln!("{:?}", config);
         config
@@ -315,6 +317,7 @@ debug_struct! { Config,
     blocktxids_cache_size,
     rpc_timeout,
     low_memory,
+    cashaccount_activation_height,
 }
 
 struct StaticCookie {

@@ -11,7 +11,7 @@ use std::collections::{HashMap, HashSet};
 use std::iter::FromIterator;
 use std::sync::RwLock;
 
-use crate::cashaccount::index_cashaccount;
+use crate::cashaccount::CashAccountParser;
 use crate::daemon::Daemon;
 use crate::errors::*;
 use crate::metrics::{
@@ -201,11 +201,10 @@ pub fn compute_script_hash(data: &[u8]) -> FullHash {
 pub fn index_transaction<'a>(
     txn: &'a Transaction,
     height: usize,
+    cashaccount: Option<&CashAccountParser>,
 ) -> impl 'a + Iterator<Item = Row> {
     let null_hash = Sha256dHash::default();
     let txid: Sha256dHash = txn.txid();
-
-    let cashaccount = index_cashaccount(txn, height as u32);
 
     let inputs = txn.input.iter().filter_map(move |input| {
         if input.previous_output.txid == null_hash {
@@ -220,14 +219,22 @@ pub fn index_transaction<'a>(
         .enumerate()
         .map(move |(i, output)| TxOutRow::new(&txid, &output, i as u64).to_row());
 
+    let cashaccount_row = match cashaccount {
+        Some(cashaccount) => cashaccount.index_cashaccount(txn, height as u32),
+        None => None,
+    };
     // Persist transaction ID and confirmed height
     inputs
         .chain(outputs)
         .chain(std::iter::once(TxRow::new(&txid, height as u32).to_row()))
-        .chain(cashaccount)
+        .chain(cashaccount_row)
 }
 
-pub fn index_block<'a>(block: &'a Block, height: usize) -> impl 'a + Iterator<Item = Row> {
+pub fn index_block<'a>(
+    block: &'a Block,
+    height: usize,
+    cashaccount: &'a CashAccountParser,
+) -> impl 'a + Iterator<Item = Row> {
     let blockhash = block.bitcoin_hash();
     // Persist block hash and header
     let row = Row {
@@ -241,7 +248,7 @@ pub fn index_block<'a>(block: &'a Block, height: usize) -> impl 'a + Iterator<It
     block
         .txdata
         .iter()
-        .flat_map(move |txn| index_transaction(&txn, height))
+        .flat_map(move |txn| index_transaction(&txn, height, Some(cashaccount)))
         .chain(std::iter::once(row))
 }
 
@@ -367,6 +374,7 @@ pub struct Index {
     daemon: Daemon,
     stats: Stats,
     batch_size: usize,
+    cashaccount_activation_height: u32,
 }
 
 impl Index {
@@ -375,6 +383,7 @@ impl Index {
         daemon: &Daemon,
         metrics: &Metrics,
         batch_size: usize,
+        cashaccount_activation_height: u32,
     ) -> Result<Index> {
         let stats = Stats::new(metrics);
         let headers = read_indexed_headers(store);
@@ -384,6 +393,7 @@ impl Index {
             daemon: daemon.reconnect()?,
             stats,
             batch_size,
+            cashaccount_activation_height,
         })
     }
 
@@ -437,6 +447,7 @@ impl Index {
                 .send(Ok(vec![]))
                 .expect("failed sending explicit end of stream");
         });
+        let cashaccount = CashAccountParser::new(Some(self.cashaccount_activation_height));
         loop {
             waiter.poll()?;
             let timer = self.stats.start_timer("fetch");
@@ -456,7 +467,8 @@ impl Index {
                     .unwrap_or_else(|| panic!("missing header for block {}", blockhash));
 
                 self.stats.update(block, height); // TODO: update stats after the block is indexed
-                index_block(block, height).chain(std::iter::once(last_indexed_block(&blockhash)))
+                index_block(block, height, &cashaccount)
+                    .chain(std::iter::once(last_indexed_block(&blockhash)))
             });
 
             let timer = self.stats.start_timer("index+write");

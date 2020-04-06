@@ -1,5 +1,3 @@
-extern crate scopeguard;
-use crate::errors::*;
 use crate::mempool::MEMPOOL_HEIGHT;
 use crate::store::ReadStore;
 use crate::store::Row;
@@ -72,6 +70,17 @@ impl TxCashAccountRow {
     }
 }
 
+pub fn txids_by_cashaccount(store: &dyn ReadStore, name: &str, height: u32) -> Vec<HashPrefix> {
+    store
+        .scan(&TxCashAccountRow::filter(
+            name.to_ascii_lowercase().as_bytes(),
+            height,
+        ))
+        .iter()
+        .map(|row| TxCashAccountRow::from_row(row).txid_prefix)
+        .collect()
+}
+
 fn parse_cashaccount(account: *mut CashAccount, txn: &Transaction) -> bool {
     let mut opreturn_found = false;
     let mut cashaccount_found = false;
@@ -102,49 +111,78 @@ fn parse_cashaccount(account: *mut CashAccount, txn: &Transaction) -> bool {
     cashaccount_found
 }
 
-pub fn index_cashaccount<'a>(txn: &'a Transaction, blockheight: u32) -> Result<Row> {
-    if blockheight == MEMPOOL_HEIGHT {
-        return Err("can't index mempool".into());
-    }
-    let account = unsafe { cashacc_account_init() };
-    let _dest = scopeguard::guard((), |_| {
-        unsafe { cashacc_account_destroy(account) };
-    });
+const CASHACCOUNT_INDEX_DISABLED: u32 = 0;
 
-    if !parse_cashaccount(account, txn) {
-        return Err("no cashaccount".into());
-    }
-    let name = unsafe { CStr::from_ptr((*account).name).to_str().unwrap() };
-    Ok(TxCashAccountRow::new(
-        &txn.txid(),
-        name.to_ascii_lowercase().as_bytes(),
-        blockheight,
-    )
-    .to_row())
+pub fn is_valid_cashaccount_height(activation_height: u32, height: u32) -> bool {
+    height >= activation_height && height != MEMPOOL_HEIGHT && height != CASHACCOUNT_INDEX_DISABLED
 }
 
-pub fn txids_by_cashaccount(store: &dyn ReadStore, name: &str, height: u32) -> Vec<HashPrefix> {
-    store
-        .scan(&TxCashAccountRow::filter(
-            name.to_ascii_lowercase().as_bytes(),
-            height,
-        ))
-        .iter()
-        .map(|row| TxCashAccountRow::from_row(row).txid_prefix)
-        .collect()
+pub struct CashAccountParser {
+    account: *mut CashAccount,
+    activation_height: u32,
 }
 
-pub fn has_cashaccount(txn: &Transaction, name: &str) -> bool {
-    let account = unsafe { cashacc_account_init() };
-    let _dest = scopeguard::guard((), |_| {
-        unsafe { cashacc_account_destroy(account) };
-    });
-    if !parse_cashaccount(account, txn) {
-        return false;
+impl CashAccountParser {
+    pub fn new(activation_height: Option<u32>) -> CashAccountParser {
+        CashAccountParser {
+            account: unsafe { cashacc_account_init() },
+            activation_height: activation_height.unwrap_or(0),
+        }
     }
-    let txn_name = unsafe { CStr::from_ptr((*account).name) };
-    match txn_name.to_str() {
-        Ok(n) => n.to_ascii_lowercase().eq(&name.to_ascii_lowercase()),
-        Err(_n) => false,
+
+    pub fn has_cashaccount(&self, txn: &Transaction, name: &str) -> bool {
+        if !parse_cashaccount(self.account, txn) {
+            return false;
+        }
+        let txn_name = unsafe { CStr::from_ptr((*self.account).name) };
+        match txn_name.to_str() {
+            Ok(n) => n.to_ascii_lowercase().eq(&name.to_ascii_lowercase()),
+            Err(_n) => false,
+        }
+    }
+
+    pub fn index_cashaccount<'a>(&self, txn: &'a Transaction, blockheight: u32) -> Option<Row> {
+        if !is_valid_cashaccount_height(self.activation_height, blockheight) {
+            return None;
+        }
+
+        if !parse_cashaccount(self.account, txn) {
+            return None;
+        }
+        let name = unsafe { CStr::from_ptr((*self.account).name).to_str().unwrap() };
+        Some(
+            TxCashAccountRow::new(
+                &txn.txid(),
+                name.to_ascii_lowercase().as_bytes(),
+                blockheight,
+            )
+            .to_row(),
+        )
+    }
+}
+
+impl Drop for CashAccountParser {
+    fn drop(&mut self) {
+        unsafe { cashacc_account_destroy(self.account) }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_is_valid_cashaccount_height() {
+        let activation = 1000;
+        assert!(!is_valid_cashaccount_height(
+            activation,
+            CASHACCOUNT_INDEX_DISABLED
+        ));
+        assert!(!is_valid_cashaccount_height(activation, MEMPOOL_HEIGHT));
+        assert!(is_valid_cashaccount_height(activation, MEMPOOL_HEIGHT - 1));
+
+        assert!(!is_valid_cashaccount_height(activation, activation - 1));
+        assert!(is_valid_cashaccount_height(activation, activation));
+        assert!(is_valid_cashaccount_height(activation, activation + 1));
     }
 }

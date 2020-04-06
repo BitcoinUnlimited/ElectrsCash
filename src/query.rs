@@ -11,7 +11,7 @@ use std::sync::{Arc, RwLock};
 
 use crate::app::App;
 use crate::cache::TransactionCache;
-use crate::cashaccount::{has_cashaccount, txids_by_cashaccount};
+use crate::cashaccount::{txids_by_cashaccount, CashAccountParser};
 use crate::errors::*;
 use crate::index::{compute_script_hash, TxInRow, TxOutRow, TxRow};
 use crate::mempool::{Tracker, MEMPOOL_HEIGHT};
@@ -685,9 +685,10 @@ impl Query {
         )?;
 
         // filter on name in case of txid prefix collision
+        let parser = CashAccountParser::new(None);
         let cashaccount_txns = cashaccount_txns
             .iter()
-            .filter(|txn| has_cashaccount(&txn.txn, name));
+            .filter(|txn| parser.has_cashaccount(&txn.txn, name));
 
         #[derive(Serialize, Deserialize, Debug)]
         struct AccountTx {
