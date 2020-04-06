@@ -3,8 +3,7 @@
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat-square)](http://makeapullrequest.com)
 [![Build Status](https://travis-ci.org/BitcoinUnlimited/ElectrsCash.svg?branch=master)](https://travis-ci.org/BitcoinUnlimited/ElectrsCash)
 
-An efficient implementation of Electrum Server, patch set on top of
-[electrs](https://github.com/romanz/electrs).
+An efficient implementation of Electrum Server.
 
 The motivation behind this project is to improve the Bitcoin Cash infrastructure
 for lightweight clients, providing them with efficient backend services.
@@ -19,7 +18,7 @@ thus preserving the privacy of the user's addresses and balances.
 
 ## Features
 
- * Supports Electrum protocol [v1.4](https://electrumx.readthedocs.io/en/latest/protocol.html)
+ * Supports Electrum protocol [v1.4.1](https://bitcoincash.network/electrum/)
  * Maintains an index over transaction inputs and outputs, allowing fast balance queries
  * Fast synchronization of the Bitcoin Cash blockchain on modest hardware
  * Low index storage overhead (~20%), relying on a local full node for transaction retrieval

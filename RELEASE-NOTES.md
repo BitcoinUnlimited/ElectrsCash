@@ -1,7 +1,23 @@
-# 1.1.0 (TBD)
-* Allow setting `--cookie-file` path via configuration
-* Setting `--network` now takes `bitcoin` instead of `mainnet` as parameter
-* Clean up RPC threads after connection is closed
+# 1.1.0 (6 April 2020)
+* [bug] Don't index cashaccounts before activation height
+* [misc] Add database version and reindex on incompatible database.
+* [misc] Allow loading config file from specified place via `--conf`
+* [misc] Allow setting `--cookie-file` path via configuration
+* [misc] Clean up RPC threads after connection is closed
+* [misc] Setting `--network` now takes `bitcoin` instead of `mainnet` as parameter
+* [qa] Script for running integration tests.
+* [rpc] Add RPC timeouts (DoS mitigation)
+* [rpc] Bump protocol version to 1.4.1
+* [rpc] Identify transactions with unconfirmed parents
+* [rpc] Implement `blockchain.scripthash.get_first_use` RPC method.
+* [rpc] Implement `server.features` RPC method.
+* [rpc] Improved error messages with error codes.
+* [rpc] Return error on unknown method rather than disconnecting the client.
+* [rpc] Use bitcoind's relay fee rather than hardcoded.
+* [speed] Better Cashaccount memory handling.
+* [speed] Better client subscription change detection
+* [speed] Better db indexes for faster scripthash lookups.
+* [speed] Better transaction caching.
 
 # 1.0.0 (18 September 2019)
 
