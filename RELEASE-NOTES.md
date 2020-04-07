@@ -5,6 +5,10 @@
 * [misc] Allow setting `--cookie-file` path via configuration
 * [misc] Clean up RPC threads after connection is closed
 * [misc] Setting `--network` now takes `bitcoin` instead of `mainnet` as parameter
+* [performance] Better Cashaccount memory handling.
+* [performance] Better client subscription change detection
+* [performance] Better db indexes for faster scripthash lookups.
+* [performance] Better transaction caching.
 * [qa] Script for running integration tests.
 * [rpc] Add RPC timeouts (DoS mitigation)
 * [rpc] Bump protocol version to 1.4.1
@@ -14,10 +18,9 @@
 * [rpc] Improved error messages with error codes.
 * [rpc] Return error on unknown method rather than disconnecting the client.
 * [rpc] Use bitcoind's relay fee rather than hardcoded.
-* [speed] Better Cashaccount memory handling.
-* [speed] Better client subscription change detection
-* [speed] Better db indexes for faster scripthash lookups.
-* [speed] Better transaction caching.
+
+Note: This release has database changes incompatible with previous versions.
+At first startup after the upgrade, ElectrsCash will do a full reindex.
 
 # 1.0.0 (18 September 2019)
 
