@@ -129,3 +129,9 @@ name = "cashaccount_activation_height"
 type = "usize"
 doc = "The activation blockheight for cashaccount. Set to 0 to disable cashaccount indexing"
 default = "563720"
+
+[[param]]
+name = "rpc_buffer_size"
+type = "usize"
+doc = "Size of the message queue for each peer. If set too small, subscription notifications may drop"
+default = "2000"

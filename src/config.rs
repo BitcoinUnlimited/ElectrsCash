@@ -141,6 +141,7 @@ pub struct Config {
     pub rpc_timeout: u16,
     pub low_memory: bool,
     pub cashaccount_activation_height: u32,
+    pub rpc_buffer_size: usize,
 }
 
 /// Returns default daemon directory
@@ -275,6 +276,7 @@ impl Config {
             rpc_timeout: config.rpc_timeout as u16,
             low_memory: config.low_memory,
             cashaccount_activation_height: config.cashaccount_activation_height as u32,
+            rpc_buffer_size: config.rpc_buffer_size,
         };
         eprintln!("{:?}", config);
         config
@@ -318,6 +320,7 @@ debug_struct! { Config,
     rpc_timeout,
     low_memory,
     cashaccount_activation_height,
+    rpc_buffer_size,
 }
 
 struct StaticCookie {

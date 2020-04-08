@@ -117,6 +117,7 @@ impl Connection {
         stats: Arc<Stats>,
         relayfee: f64,
         rpc_timeout: u16,
+        buffer_size: usize,
     ) -> Connection {
         Connection {
             query,
@@ -124,7 +125,7 @@ impl Connection {
             status_hashes: HashMap::new(),
             stream,
             addr,
-            chan: SyncChannel::new(10),
+            chan: SyncChannel::new(buffer_size),
             stats,
             relayfee,
             rpc_timeout,
@@ -758,6 +759,7 @@ impl RPC {
         metrics: &Metrics,
         relayfee: f64,
         rpc_timeout: u16,
+        rpc_buffer_size: usize,
     ) -> RPC {
         let stats = Arc::new(Stats {
             latency: metrics.histogram_vec(
@@ -796,8 +798,15 @@ impl RPC {
 
                         spawn_thread("peer", move || {
                             info!("[{}] connected peer #{}", addr, handle_id);
-                            let conn =
-                                Connection::new(query, stream, addr, stats, relayfee, rpc_timeout);
+                            let conn = Connection::new(
+                                query,
+                                stream,
+                                addr,
+                                stats,
+                                relayfee,
+                                rpc_timeout,
+                                rpc_buffer_size,
+                            );
                             senders
                                 .lock()
                                 .unwrap()
