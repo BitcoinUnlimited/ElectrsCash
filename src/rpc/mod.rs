@@ -14,21 +14,20 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
-use crate::def::{
-    ELECTRSCASH_VERSION, PROTOCOL_HASH_FUNCTION, PROTOCOL_VERSION_MAX, PROTOCOL_VERSION_MIN,
-};
+use crate::def::{PROTOCOL_HASH_FUNCTION, PROTOCOL_VERSION_MAX, PROTOCOL_VERSION_MIN};
 use crate::errors::*;
 use crate::index::compute_script_hash;
 use crate::mempool::MEMPOOL_HEIGHT;
 use crate::metrics::{Gauge, HistogramOpts, HistogramVec, MetricOpts, Metrics};
 use crate::query::{Query, Status};
+use crate::rpc::parseutil::rpc_arg_error;
+use crate::rpc::server::{server_version, versionstr};
 use crate::timeout::TimeoutTrigger;
 use crate::util::FullHash;
 use crate::util::{spawn_thread, Channel, HeaderEntry, SyncChannel};
 
-fn rpc_arg_error(what: &str) -> ErrorKind {
-    ErrorKind::RpcError(RpcErrorCode::InvalidParams, what.to_string())
-}
+pub mod parseutil;
+pub mod server;
 
 // TODO: Sha256dHash should be a generic hash-container (since script hash is single SHA256)
 fn hash_from_value(val: Option<&Value>) -> Result<Sha256dHash> {
@@ -140,13 +139,6 @@ impl Connection {
         Ok(result)
     }
 
-    fn server_version(&self) -> Result<Value> {
-        Ok(json!([
-            format!("ElectrsCash {}", ELECTRSCASH_VERSION),
-            [PROTOCOL_VERSION_MIN, PROTOCOL_VERSION_MAX]
-        ]))
-    }
-
     fn server_banner(&self) -> Result<Value> {
         Ok(json!(self.query.get_banner()?))
     }
@@ -166,7 +158,7 @@ impl Connection {
             "hash_function": PROTOCOL_HASH_FUNCTION,
             "protocol_max": PROTOCOL_VERSION_MAX,
             "protocol_min": PROTOCOL_VERSION_MIN,
-            "server_version": format!("ElectrsCash {}", ELECTRSCASH_VERSION),
+            "server_version": versionstr(),
             "firstuse": ["1.0"]
         }))
     }
@@ -484,7 +476,7 @@ impl Connection {
             "server.donation_address" => self.server_donation_address(),
             "server.peers.subscribe" => self.server_peers_subscribe(),
             "server.ping" => Ok(Value::Null),
-            "server.version" => self.server_version(),
+            "server.version" => server_version(&params),
             "server.features" => self.server_features(),
             "cashaccount.query.name" => self.cashaccount_query_name(&params),
             &_ => Err(ErrorKind::RpcError(
