@@ -85,7 +85,6 @@ fn run_server(config: &Config) -> Result<()> {
     let query = Query::new(app.clone(), &metrics, tx_cache, config.txid_limit);
     let relayfee = query.get_relayfee()?;
     debug!("relayfee: {}", relayfee);
-    let rpc_timeout = config.rpc_timeout;
 
     let mut server: Option<RPC> = None; // Electrum RPC server
 
@@ -106,7 +105,8 @@ fn run_server(config: &Config) -> Result<()> {
                 query.clone(),
                 &metrics,
                 relayfee,
-                rpc_timeout,
+                config.rpc_timeout,
+                config.rpc_buffer_size,
             )),
         };
         if let Err(err) = signal.wait(Duration::from_secs(5)) {
