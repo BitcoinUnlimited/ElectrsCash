@@ -1,7 +1,12 @@
-use crate::def::{ELECTRSCASH_VERSION, PROTOCOL_VERSION_MAX, PROTOCOL_VERSION_MIN};
+use crate::def::{
+    ELECTRSCASH_VERSION, PROTOCOL_HASH_FUNCTION, PROTOCOL_VERSION_MAX, PROTOCOL_VERSION_MIN,
+};
 use crate::errors::*;
+use crate::query::Query;
 use crate::rpc::parseutil::{rpc_arg_error, str_from_value};
+use bitcoin_hashes::hex::ToHex;
 use serde_json::Value;
+use std::sync::Arc;
 
 use version_compare::Version;
 
@@ -36,7 +41,7 @@ fn best_match_response(client_min: &Version, client_max: &Version) -> Value {
     json!([versionstr(), best_match(client_min, client_max).to_string()])
 }
 
-pub fn versionstr() -> String {
+fn versionstr() -> String {
     format!("ElectrsCash {}", ELECTRSCASH_VERSION)
 }
 
@@ -64,6 +69,30 @@ pub fn server_version(params: &[Value]) -> Result<Value> {
     }
 
     Err(rpc_arg_error("invalid value in version argument").into())
+}
+
+pub fn server_banner(query: &Arc<Query>) -> Result<Value> {
+    Ok(json!(query.get_banner()?))
+}
+
+pub fn server_donation_address() -> Result<Value> {
+    Ok(Value::Null)
+}
+
+pub fn server_peers_subscribe() -> Result<Value> {
+    Ok(json!([]))
+}
+
+pub fn server_features(query: &Arc<Query>) -> Result<Value> {
+    let genesis_header = query.get_headers(&[0])[0].clone();
+    Ok(json!({
+        "genesis_hash" : genesis_header.hash().to_hex(),
+        "hash_function": PROTOCOL_HASH_FUNCTION,
+        "protocol_max": PROTOCOL_VERSION_MAX,
+        "protocol_min": PROTOCOL_VERSION_MIN,
+        "server_version": versionstr(),
+        "firstuse": ["1.0"]
+    }))
 }
 
 #[cfg(test)]
