@@ -22,7 +22,8 @@ use crate::metrics::{Gauge, HistogramOpts, HistogramVec, MetricOpts, Metrics};
 use crate::query::{Query, Status};
 use crate::rpc::parseutil::rpc_arg_error;
 use crate::rpc::server::{
-    server_banner, server_donation_address, server_features, server_peers_subscribe, server_version,
+    server_add_peer, server_banner, server_donation_address, server_features,
+    server_peers_subscribe, server_version,
 };
 use crate::timeout::TimeoutTrigger;
 use crate::util::FullHash;
@@ -450,12 +451,13 @@ impl Connection {
                 self.blockchain_transaction_id_from_pos(&params)
             }
             "mempool.get_fee_histogram" => self.mempool_get_fee_histogram(),
+            "server.add_peer" => server_add_peer(),
             "server.banner" => server_banner(&self.query),
             "server.donation_address" => server_donation_address(),
+            "server.features" => server_features(&self.query),
             "server.peers.subscribe" => server_peers_subscribe(),
             "server.ping" => Ok(Value::Null),
             "server.version" => server_version(&params),
-            "server.features" => server_features(&self.query),
             "cashaccount.query.name" => self.cashaccount_query_name(&params),
             &_ => Err(ErrorKind::RpcError(
                 RpcErrorCode::MethodNotFound,

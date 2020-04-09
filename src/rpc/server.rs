@@ -95,6 +95,10 @@ pub fn server_features(query: &Arc<Query>) -> Result<Value> {
     }))
 }
 
+pub fn server_add_peer() -> Result<Value> {
+    Ok(json!(true))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
