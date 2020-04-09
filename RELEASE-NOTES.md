@@ -1,4 +1,13 @@
-# 1.1.0 (6 April 2020)
+# Release notes
+
+## 1.1.1 (10 April 2020)
+* [bug] Fix protocol-negotiation in `server.version` response (#61)
+* [bug] Fix dropped notification due to full client buffer (#60)
+* [bug] Reduce log level on client errors (#64)
+
+This is a bug-fix only release. No breaking changes.
+
+## 1.1.0 (6 April 2020)
 * [bug] Don't index cashaccounts before activation height
 * [misc] Add database version and reindex on incompatible database.
 * [misc] Allow loading config file from specified place via `--conf`
@@ -22,7 +31,7 @@
 Note: This release has database changes incompatible with previous versions.
 At first startup after the upgrade, ElectrsCash will do a full reindex.
 
-# 1.0.0 (18 September 2019)
+## 1.0.0 (18 September 2019)
 
 * Cache capacity is now defined in megabytes, rather than number of entries.
 * Support Rust >=1.34
@@ -32,7 +41,7 @@ At first startup after the upgrade, ElectrsCash will do a full reindex.
 * Cache list of transaction IDs for blocks
 * Prefix Prometheus metrics with 'electrscash_'
 
-# 0.7.0 (13 June 2019)
+## 0.7.0 (13 June 2019)
 
 * Support Bitcoin Core 0.18
 * Build with LTO
@@ -41,16 +50,16 @@ At first startup after the upgrade, ElectrsCash will do a full reindex.
 * Use atomics instead of `Mutex<u64>` (@Kixunil)
 * Better handling invalid blocks (@azuchi)
 
-# 0.6.2 (17 May 2019)
+## 0.6.2 (17 May 2019)
 
 * Support Rust 1.32 (for Debian)
 
-# 0.6.1 (9 May 2019)
+## 0.6.1 (9 May 2019)
 
 * Fix crash during initial sync
 * Switch to `signal-hook` crate
 
-# 0.6.0 (29 Apr 2019)
+## 0.6.0 (29 Apr 2019)
 
 * Update to Rust 1.34
 * Prefix Prometheus metrics with 'electrs_'
@@ -60,35 +69,35 @@ At first startup after the upgrade, ElectrsCash will do a full reindex.
 * Fix "chain-trimming" reorgs
 * Serve by default on IPv4 localhost
 
-# 0.5.0 (3 Mar 2019)
+## 0.5.0 (3 Mar 2019)
 
 * Limit query results, to prevent RPC server to get stuck (see `--txid-limit` flag)
 * Update RocksDB crate to 0.11
 * Update Bitcoin crate to 0.17
 
-# 0.4.3 (23 Dec 2018)
+## 0.4.3 (23 Dec 2018)
 
 * Support Rust 2018 edition (1.31)
 * Upgrade to Electrum protocol 1.4 (from 1.2)
 * Let server banner be configurable via command-line flag
 * Improve query.get_merkle_proof() performance
 
-# 0.4.2 (22 Nov 2018)
+## 0.4.2 (22 Nov 2018)
 
 * Update to rust-bitcoin 0.15.1
 * Use bounded LRU cache for transaction retrieval
 * Support 'server.ping' and partially 'blockchain.block.header' Electrum RPC
 
-# 0.4.1 (14 Oct 2018)
+## 0.4.1 (14 Oct 2018)
 
 * Don't run full compaction after initial import is over (when using JSONRPC)
 
-# 0.4.0 (22 Sep 2018)
+## 0.4.0 (22 Sep 2018)
 
 * Optimize for low-memory systems by using different RocksDB settings
 * Rename `--skip_bulk_import` flag to `--jsonrpc-import`
 
-# 0.3.2 (14 Sep 2018)
+## 0.3.2 (14 Sep 2018)
 
 * Optimize block headers processing during startup
 * Handle TCP disconnections during long RPCs
@@ -97,12 +106,12 @@ At first startup after the upgrade, ElectrsCash will do a full reindex.
 * Optimize block headers processing during startup
 
 
-# 0.3.1 (20 Aug 2018)
+## 0.3.1 (20 Aug 2018)
 
 * Reconnect to bitcoind only on transient errors
 * Poll mempool after transaction broadcasting
 
-# 0.3.0 (14 Aug 2018)
+## 0.3.0 (14 Aug 2018)
 
 * Optimize for low-memory systems
 * Improve compaction performance
@@ -115,14 +124,14 @@ At first startup after the upgrade, ElectrsCash will do a full reindex.
 * Add some Python tools (as API usage examples)
 * Change default Prometheus monitoring ports
 
-# 0.2.0 (14 Jul 2018)
+## 0.2.0 (14 Jul 2018)
 
 * Allow specifying custom bitcoind data directory
 * Allow specifying JSONRPC cookie from commandline
 * Improve initial bulk indexing performance
 * Support 32-bit systems
 
-# 0.1.0 (2 Jul 2018)
+## 0.1.0 (2 Jul 2018)
 
 * Announcement: https://lists.linuxfoundation.org/pipermail/bitcoin-dev/2018-July/016190.html
 * Published to https://crates.io/electrs and https://docs.rs/electrs
