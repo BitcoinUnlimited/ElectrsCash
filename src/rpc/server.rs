@@ -48,7 +48,7 @@ pub fn parse_version(version: &str) -> Result<Version> {
 pub fn server_version(params: &[Value]) -> Result<Value> {
     // default to spec default on missing argument
     let default_version = json!(SPEC_DEFAULT_VERSION);
-    let val = params.get(0).unwrap_or(&default_version);
+    let val = params.get(1).unwrap_or(&default_version);
 
     if let Ok(versionstr) = str_from_value(Some(val), "version") {
         let version = parse_version(&versionstr)?;
@@ -81,25 +81,28 @@ mod tests {
 
     #[test]
     fn test_server_version_strarg() {
-        let resp = server_version(&[json!("1.3")]).unwrap();
+        let clientver = json!("bestclient 1.0");
+        let resp = server_version(&[clientver.clone(), json!("1.3")]).unwrap();
         assert_eq!(resp[1].as_str().unwrap(), PROTOCOL_VERSION_MIN);
-        let resp = server_version(&[json!("13.3.7")]).unwrap();
+        let resp = server_version(&[clientver.clone(), json!("13.3.7")]).unwrap();
         assert_eq!(resp[1].as_str().unwrap(), PROTOCOL_VERSION_MAX);
     }
 
     #[test]
     fn test_server_version_minmax() {
+        let clientver = json!("bestclient 1.0");
         // client max is higher than our max, we should return our max
-        let resp = server_version(&[json!(["1.4", "13.3.7"])]).unwrap();
+        let resp = server_version(&[clientver.clone(), json!(["1.4", "13.3.7"])]).unwrap();
         assert_eq!(resp[1].as_str().unwrap(), PROTOCOL_VERSION_MAX);
 
         // client max is lower than our min, we shoud return our min
-        let resp = server_version(&[json!(["1.2", "1.3"])]).unwrap();
+        let resp = server_version(&[clientver.clone(), json!(["1.2", "1.3"])]).unwrap();
         assert_eq!(resp[1].as_str().unwrap(), PROTOCOL_VERSION_MIN);
 
         // client max is somewhere between our max and min, return same version
         let client_max = "1.4.1";
-        let resp = server_version(&[json!([PROTOCOL_VERSION_MIN, client_max])]).unwrap();
+        let resp = server_version(&[clientver.clone(), json!([PROTOCOL_VERSION_MIN, client_max])])
+            .unwrap();
         assert_eq!(resp[1].as_str().unwrap(), client_max);
     }
 }
