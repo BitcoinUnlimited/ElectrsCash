@@ -26,9 +26,12 @@ use electrscash::{
 
 fn run_server(config: &Config) -> Result<()> {
     let signal = Waiter::start();
-    let metrics = Metrics::new(config.monitoring_addr);
+    let metrics = Arc::new(Metrics::new(config.monitoring_addr));
     metrics.start();
-    let blocktxids_cache = Arc::new(BlockTxIDsCache::new(config.blocktxids_cache_size, &metrics));
+    let blocktxids_cache = Arc::new(BlockTxIDsCache::new(
+        config.blocktxids_cache_size,
+        &*metrics,
+    ));
 
     let daemon = Daemon::new(
         &config.daemon_dir,
@@ -37,7 +40,7 @@ fn run_server(config: &Config) -> Result<()> {
         config.network_type,
         signal.clone(),
         blocktxids_cache,
-        &metrics,
+        &*metrics,
     )?;
     // Perform initial indexing.
     let compatible = {
@@ -53,7 +56,7 @@ fn run_server(config: &Config) -> Result<()> {
     let index = Index::load(
         &store,
         &daemon,
-        &metrics,
+        &*metrics,
         config.index_batch_size,
         config.cashaccount_activation_height,
     )?;
@@ -69,7 +72,7 @@ fn run_server(config: &Config) -> Result<()> {
         let store = bulk::index_blk_files(
             &daemon,
             config.bulk_index_threads,
-            &metrics,
+            &&*metrics,
             &signal,
             store,
             config.cashaccount_activation_height,
@@ -81,8 +84,8 @@ fn run_server(config: &Config) -> Result<()> {
     .enable_compaction(); // enable auto compactions before starting incremental index updates.
 
     let app = App::new(store, index, daemon, &config)?;
-    let tx_cache = TransactionCache::new(config.tx_cache_size, &metrics);
-    let query = Query::new(app.clone(), &metrics, tx_cache, config.txid_limit);
+    let tx_cache = TransactionCache::new(config.tx_cache_size, &*metrics);
+    let query = Query::new(app.clone(), &*metrics, tx_cache, config.txid_limit);
     let relayfee = query.get_relayfee()?;
     debug!("relayfee: {}", relayfee);
 
@@ -103,7 +106,7 @@ fn run_server(config: &Config) -> Result<()> {
             None => Some(RPC::start(
                 config.electrum_rpc_addr,
                 query.clone(),
-                &metrics,
+                metrics.clone(),
                 relayfee,
                 config.rpc_timeout,
                 config.rpc_buffer_size,
