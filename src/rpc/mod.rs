@@ -586,9 +586,10 @@ impl Connection {
     fn send_values(&mut self, values: &[Value]) -> Result<()> {
         for value in values {
             let line = value.to_string() + "\n";
-            self.stream
-                .write_all(line.as_bytes())
-                .chain_err(|| format!("failed to send {}", value))?;
+            if let Err(e) = self.stream.write_all(line.as_bytes()) {
+                let truncated: String = line.chars().take(80).collect();
+                return Err(e).chain_err(|| format!("failed to send {}", truncated));
+            }
         }
         Ok(())
     }
@@ -655,7 +656,7 @@ impl Connection {
         let tx = self.chan.sender();
         let child = spawn_thread("reader", || Connection::handle_requests(reader, tx));
         if let Err(e) = self.handle_replies() {
-            error!(
+            debug!(
                 "[{}] connection handling failed: {}",
                 self.addr,
                 e.display_chain().to_string()
