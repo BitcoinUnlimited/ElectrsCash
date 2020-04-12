@@ -5,7 +5,7 @@ use serde_json::{from_str, Value};
 use std::collections::{HashMap, HashSet};
 use std::io::{BufRead, BufReader, Write};
 use std::net::{Shutdown, SocketAddr, TcpListener, TcpStream};
-use std::sync::mpsc::{Sender, SyncSender};
+use std::sync::mpsc::{Sender, SyncSender, TrySendError};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
@@ -310,27 +310,34 @@ struct Stats {
 impl RPC {
     fn start_notifier(
         notification: Channel<Notification>,
-        senders: Arc<Mutex<HashMap<i32, SyncSender<Message>>>>,
+        senders: Arc<Mutex<Vec<SyncSender<Message>>>>,
         acceptor: Sender<Option<(TcpStream, SocketAddr)>>,
     ) {
         spawn_thread("notification", move || {
             for msg in notification.receiver().iter() {
-                let senders = senders.lock().unwrap();
+                let mut senders = senders.lock().unwrap();
                 match msg {
-                    Notification::ScriptHashChange(hash) => {
-                        for (i, sender) in senders.iter() {
-                            if let Err(e) = sender.try_send(Message::ScriptHashChange(hash)) {
-                                debug!("failed to send ScriptHashChange to peer {}: {}", i, e);
-                            }
+                    Notification::ScriptHashChange(hash) => senders.retain(|sender| {
+                        if let Err(TrySendError::Disconnected(_)) =
+                            sender.try_send(Message::ScriptHashChange(hash))
+                        {
+                            debug!("peer disconnected");
+                            false
+                        } else {
+                            true
                         }
-                    }
-                    Notification::ChainTipChange(hash) => {
-                        for (i, sender) in senders.iter() {
-                            if let Err(e) = sender.try_send(Message::ChainTipChange(hash.clone())) {
-                                debug!("failed to send ChainTipChange to peer {}: {}", i, e);
-                            }
+                    }),
+                    Notification::ChainTipChange(hash) => senders.retain(|sender| {
+                        if let Err(TrySendError::Disconnected(_)) =
+                            sender.try_send(Message::ChainTipChange(hash.clone()))
+                        {
+                            debug!("peer disconnected");
+                            false
+                        } else {
+                            true
                         }
-                    }
+                    }),
+                    // mark acceptor as done
                     Notification::Exit => acceptor.send(None).unwrap(),
                 }
             }
@@ -377,78 +384,65 @@ impl RPC {
             notification: notification.sender(),
             query: query.clone(),
             server: Some(spawn_thread("rpc", move || {
-                let senders = Arc::new(Mutex::new(HashMap::<i32, SyncSender<Message>>::new()));
-                let handles = Arc::new(Mutex::new(
-                    HashMap::<i32, std::thread::JoinHandle<()>>::new(),
-                ));
+                let senders = Arc::new(Mutex::new(Vec::<SyncSender<Message>>::new()));
 
                 let acceptor = RPC::start_acceptor(addr);
                 RPC::start_notifier(notification, senders.clone(), acceptor.sender());
 
-                let mut handle_count = 0;
+                let mut threads = HashMap::new();
+                let (garbage_sender, garbage_receiver) = crossbeam_channel::unbounded();
+
                 while let Some((stream, addr)) = acceptor.receiver().recv().unwrap() {
-                    let handle_id = handle_count;
-                    handle_count += 1;
-
                     // explicitely scope the shadowed variables for the new thread
-                    let handle: thread::JoinHandle<()> = {
-                        let query = Arc::clone(&query);
-                        let senders = Arc::clone(&senders);
-                        let stats = Arc::clone(&stats);
-                        let handles = Arc::clone(&handles);
-                        let metrics = Arc::clone(&metrics);
+                    let query = Arc::clone(&query);
+                    let senders = Arc::clone(&senders);
+                    let stats = Arc::clone(&stats);
+                    let metrics = Arc::clone(&metrics);
+                    let garbage_sender = garbage_sender.clone();
 
-                        spawn_thread("peer", move || {
-                            info!("[{}] connected peer #{}", addr, handle_id);
-                            let conn = Connection::new(
-                                query,
-                                metrics,
-                                stream,
-                                addr,
-                                stats,
-                                relayfee,
-                                rpc_timeout,
-                                rpc_buffer_size,
-                            );
-                            senders
-                                .lock()
-                                .unwrap()
-                                .insert(handle_id, conn.chan.sender());
-                            conn.run();
-                            info!("[{}] disconnected peer #{}", addr, handle_id);
+                    let spawned = spawn_thread("peer", move || {
+                        info!("[{}] connected peer", addr);
+                        let conn = Connection::new(
+                            query,
+                            metrics,
+                            stream,
+                            addr,
+                            stats,
+                            relayfee,
+                            rpc_timeout,
+                            rpc_buffer_size,
+                        );
+                        senders.lock().unwrap().push(conn.chan.sender());
+                        conn.run();
+                        info!("[{}] disconnected peer", addr);
+                        let _ = garbage_sender.send(std::thread::current().id());
+                    });
 
-                            senders.lock().unwrap().remove(&handle_id);
-                            handles.lock().unwrap().remove(&handle_id);
-                        })
-                    };
+                    threads.insert(spawned.thread().id(), spawned);
+                    while let Ok(id) = garbage_receiver.try_recv() {
+                        let result = threads
+                            .remove(&id)
+                            .map(std::thread::JoinHandle::join)
+                            .transpose();
 
-                    handles.lock().unwrap().insert(handle_id, handle);
+                        if let Err(error) = result {
+                            error!("Failed to join thread: {:?}", error);
+                        }
+                    }
                 }
-                trace!("closing {} RPC connections", senders.lock().unwrap().len());
-                for sender in senders.lock().unwrap().values() {
+                info!("closing {} RPC connections", senders.lock().unwrap().len());
+                for sender in senders.lock().unwrap().iter() {
                     let _ = sender.send(Message::Done);
                 }
 
-                trace!(
-                    "waiting for {} RPC handling threads",
-                    handles.lock().unwrap().len()
-                );
+                info!("waiting for {} RPC handling threads", threads.len());
 
-                let handle_ids: Vec<i32> =
-                    handles.lock().unwrap().keys().map(|i| i.clone()).collect();
-                for id in handle_ids {
-                    let h = handles.lock().unwrap().remove(&id);
-                    match h {
-                        Some(h) => {
-                            if let Err(e) = h.join() {
-                                warn!("failed to join thread: {:?}", e);
-                            }
-                        }
-                        None => {}
+                for (_, thread) in threads {
+                    if let Err(error) = thread.join() {
+                        error!("Failed to join thread: {:?}", error);
                     }
                 }
-
-                trace!("RPC connections are closed");
+                info!("RPC connections are closed");
             })),
         }
     }
