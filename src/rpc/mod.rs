@@ -418,15 +418,14 @@ impl RPC {
                         let _ = garbage_sender.send(std::thread::current().id());
                     });
 
+                    trace!("[{}] spawned {:?}", addr, spawned.thread().id());
                     threads.insert(spawned.thread().id(), spawned);
                     while let Ok(id) = garbage_receiver.try_recv() {
-                        let result = threads
-                            .remove(&id)
-                            .map(std::thread::JoinHandle::join)
-                            .transpose();
-
-                        if let Err(error) = result {
-                            error!("Failed to join thread: {:?}", error);
+                        if let Some(thread) = threads.remove(&id) {
+                            trace!("[{}] joining {:?}", addr, id);
+                            if let Err(error) = thread.join() {
+                                error!("failed to join {:?}: {:?}", id, error);
+                            }
                         }
                     }
                 }
@@ -437,9 +436,10 @@ impl RPC {
 
                 info!("waiting for {} RPC handling threads", threads.len());
 
-                for (_, thread) in threads {
+                for (id, thread) in threads {
+                    trace!("joining {:?}", id);
                     if let Err(error) = thread.join() {
-                        error!("Failed to join thread: {:?}", error);
+                        error!("failed to join {:?}: {:?}", id, error);
                     }
                 }
                 info!("RPC connections are closed");
