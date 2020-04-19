@@ -6,7 +6,7 @@ use crate::util::{hash_prefix, Bytes, HashPrefix};
 use bincode;
 use bitcoin::blockdata::script::Script;
 use bitcoin::blockdata::transaction::Transaction;
-use bitcoin_hashes::sha256d::Hash as Sha256dHash;
+use bitcoin::hash_types::Txid;
 use c_fixed_string::CFixedStr;
 use cashaccount_sys::{
     cashacc_account_destroy, cashacc_account_init, cashacc_parse_opreturn, CashAccount,
@@ -38,7 +38,7 @@ pub struct TxCashAccountRow {
 }
 
 impl TxCashAccountRow {
-    pub fn new(txid: &Sha256dHash, accountname: &[u8], blockheight: u32) -> TxCashAccountRow {
+    pub fn new(txid: &Txid, accountname: &[u8], blockheight: u32) -> TxCashAccountRow {
         TxCashAccountRow {
             key: TxCashAccountKey {
                 code: b'C',

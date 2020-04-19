@@ -1,5 +1,5 @@
 use bitcoin::blockdata::transaction::Transaction;
-use bitcoin_hashes::sha256d::Hash as Sha256dHash;
+use bitcoin::hash_types::{BlockHash, Txid};
 use error_chain::ChainedError;
 use serde_json::{from_str, Value};
 use std::collections::{HashMap, HashSet};
@@ -449,8 +449,8 @@ impl RPC {
 
     fn get_scripthashes_effected_by_tx(
         &self,
-        txid: &Sha256dHash,
-        blockhash: Option<&Sha256dHash>,
+        txid: &Txid,
+        blockhash: Option<&BlockHash>,
     ) -> Result<Vec<FullHash>> {
         let txn = self.query.load_txn(txid, blockhash, None)?;
         let mut scripthashes = get_output_scripthash(&txn, None);
@@ -459,7 +459,7 @@ impl RPC {
             if txin.previous_output.is_null() {
                 continue;
             }
-            let id: &Sha256dHash = &txin.previous_output.txid;
+            let id: &Txid = &txin.previous_output.txid;
             let n = txin.previous_output.vout as usize;
 
             let txn = self.query.load_txn(&id, None, None)?;
@@ -471,9 +471,9 @@ impl RPC {
     pub fn notify_scripthash_subscriptions(
         &self,
         headers_changed: &Vec<HeaderEntry>,
-        txs_changed: HashSet<Sha256dHash>,
+        txs_changed: HashSet<Txid>,
     ) {
-        let mut txn_done: HashSet<Sha256dHash> = HashSet::new();
+        let mut txn_done: HashSet<Txid> = HashSet::new();
         let mut scripthashes: HashSet<FullHash> = HashSet::new();
 
         let mut insert_for_tx = |txid, blockhash| {
