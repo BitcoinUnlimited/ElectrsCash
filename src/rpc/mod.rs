@@ -14,14 +14,17 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
-use crate::def::{PROTOCOL_HASH_FUNCTION, PROTOCOL_VERSION_MAX, PROTOCOL_VERSION_MIN};
+use crate::def::PROTOCOL_VERSION_MAX;
 use crate::errors::*;
 use crate::index::compute_script_hash;
 use crate::mempool::MEMPOOL_HEIGHT;
 use crate::metrics::{Gauge, HistogramOpts, HistogramVec, MetricOpts, Metrics};
 use crate::query::{Query, Status};
 use crate::rpc::parseutil::rpc_arg_error;
-use crate::rpc::server::{server_version, versionstr};
+use crate::rpc::server::{
+    server_add_peer, server_banner, server_donation_address, server_features,
+    server_peers_subscribe, server_version,
+};
 use crate::timeout::TimeoutTrigger;
 use crate::util::FullHash;
 use crate::util::{spawn_thread, Channel, HeaderEntry, SyncChannel};
@@ -137,30 +140,6 @@ impl Connection {
         let result = json!({"hex": hex_header, "height": entry.height()});
         self.last_header_entry = Some(entry);
         Ok(result)
-    }
-
-    fn server_banner(&self) -> Result<Value> {
-        Ok(json!(self.query.get_banner()?))
-    }
-
-    fn server_donation_address(&self) -> Result<Value> {
-        Ok(Value::Null)
-    }
-
-    fn server_peers_subscribe(&self) -> Result<Value> {
-        Ok(json!([]))
-    }
-
-    fn server_features(&self) -> Result<Value> {
-        let genesis_header = self.query.get_headers(&[0])[0].clone();
-        Ok(json!({
-            "genesis_hash" : genesis_header.hash().to_hex(),
-            "hash_function": PROTOCOL_HASH_FUNCTION,
-            "protocol_max": PROTOCOL_VERSION_MAX,
-            "protocol_min": PROTOCOL_VERSION_MIN,
-            "server_version": versionstr(),
-            "firstuse": ["1.0"]
-        }))
     }
 
     fn mempool_get_fee_histogram(&self) -> Result<Value> {
@@ -472,12 +451,13 @@ impl Connection {
                 self.blockchain_transaction_id_from_pos(&params)
             }
             "mempool.get_fee_histogram" => self.mempool_get_fee_histogram(),
-            "server.banner" => self.server_banner(),
-            "server.donation_address" => self.server_donation_address(),
-            "server.peers.subscribe" => self.server_peers_subscribe(),
+            "server.add_peer" => server_add_peer(),
+            "server.banner" => server_banner(&self.query),
+            "server.donation_address" => server_donation_address(),
+            "server.features" => server_features(&self.query),
+            "server.peers.subscribe" => server_peers_subscribe(),
             "server.ping" => Ok(Value::Null),
             "server.version" => server_version(&params),
-            "server.features" => self.server_features(),
             "cashaccount.query.name" => self.cashaccount_query_name(&params),
             &_ => Err(ErrorKind::RpcError(
                 RpcErrorCode::MethodNotFound,
