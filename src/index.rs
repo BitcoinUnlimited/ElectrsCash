@@ -5,8 +5,6 @@ use bitcoin::consensus::encode::{deserialize, serialize};
 use bitcoin::util::hash::BitcoinHash;
 use bitcoin_hashes::sha256d::Hash as Sha256dHash;
 use bitcoin_hashes::Hash;
-use crypto::digest::Digest;
-use crypto::sha2::Sha256;
 use std::collections::{HashMap, HashSet};
 use std::iter::FromIterator;
 use std::sync::RwLock;
@@ -17,6 +15,7 @@ use crate::errors::*;
 use crate::metrics::{
     Counter, Gauge, HistogramOpts, HistogramTimer, HistogramVec, MetricOpts, Metrics,
 };
+use crate::scripthashutil::compute_script_hash;
 use crate::signal::Waiter;
 use crate::store::{ReadStore, Row, WriteStore};
 use crate::util::{
@@ -188,14 +187,6 @@ impl TxRow {
 struct BlockKey {
     code: u8,
     hash: FullHash,
-}
-
-pub fn compute_script_hash(data: &[u8]) -> FullHash {
-    let mut hash = FullHash::default();
-    let mut sha2 = Sha256::new();
-    sha2.input(data);
-    sha2.result(&mut hash);
-    hash
 }
 
 pub fn index_transaction<'a>(
