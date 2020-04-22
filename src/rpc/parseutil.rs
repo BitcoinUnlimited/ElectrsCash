@@ -1,4 +1,6 @@
 use crate::errors::*;
+use crate::scripthash::decode_scripthash;
+use crate::scripthash::FullHash;
 use bitcoin_hashes::hex::FromHex;
 use bitcoin_hashes::sha256d::Hash as Sha256dHash;
 use serde_json::Value;
@@ -18,19 +20,27 @@ pub fn bool_from_value_or(val: Option<&Value>, name: &str, default: bool) -> Res
     bool_from_value(val, name)
 }
 
-// TODO: Sha256dHash should be a generic hash-container (since script hash is single SHA256)
-pub fn hash_from_value(val: Option<&Value>) -> Result<Sha256dHash> {
+pub fn scripthash_from_value(val: Option<&Value>) -> Result<FullHash> {
     let script_hash = val.chain_err(|| rpc_arg_error("missing hash"))?;
     let script_hash = script_hash
         .as_str()
         .chain_err(|| rpc_arg_error("non-string hash"))?;
     let script_hash =
-        Sha256dHash::from_hex(script_hash).chain_err(|| rpc_arg_error("non-hex hash"))?;
+        decode_scripthash(script_hash).chain_err(|| rpc_arg_error("invalid scripthash"))?;
     Ok(script_hash)
 }
 
 pub fn rpc_arg_error(what: &str) -> ErrorKind {
     ErrorKind::RpcError(RpcErrorCode::InvalidParams, what.to_string())
+}
+
+pub fn sha256d_from_value(val: Option<&Value>) -> Result<Sha256dHash> {
+    let hash = val.chain_err(|| rpc_arg_error("missing hash"))?;
+    let hash = hash
+        .as_str()
+        .chain_err(|| rpc_arg_error("non-string hash"))?;
+    let hash = Sha256dHash::from_hex(hash).chain_err(|| rpc_arg_error("invalid hash"))?;
+    Ok(hash)
 }
 
 pub fn str_from_value(val: Option<&Value>, name: &str) -> Result<String> {

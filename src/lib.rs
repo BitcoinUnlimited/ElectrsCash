@@ -24,7 +24,7 @@ pub mod mempool;
 pub mod metrics;
 pub mod query;
 pub mod rpc;
-pub mod scripthashutil;
+pub mod scripthash;
 pub mod signal;
 pub mod store;
 pub mod timeout;

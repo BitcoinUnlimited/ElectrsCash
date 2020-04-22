@@ -20,9 +20,8 @@ use crate::rpc::server::{
     server_add_peer, server_banner, server_donation_address, server_features,
     server_peers_subscribe, server_version,
 };
-use crate::scripthashutil::compute_script_hash;
+use crate::scripthash::{compute_script_hash, FullHash};
 use crate::timeout::TimeoutTrigger;
-use crate::util::FullHash;
 use crate::util::{spawn_thread, Channel, HeaderEntry, SyncChannel};
 
 pub mod blockchain;

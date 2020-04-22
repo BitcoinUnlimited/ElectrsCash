@@ -3,9 +3,28 @@ use bitcoin::blockdata::script::{Builder, Script};
 use bitcoincash_addr::{Address, HashType};
 use crypto::digest::Digest;
 use crypto::sha2::Sha256;
+use std::convert::TryInto;
 
 use crate::errors::*;
-use crate::util::{full_hash, FullHash};
+
+const HASH_LEN: usize = 32;
+pub type FullHash = [u8; HASH_LEN];
+
+pub trait ToLEHex {
+    fn to_le_hex(&self) -> String;
+}
+
+impl ToLEHex for FullHash {
+    fn to_le_hex(&self) -> String {
+        let mut h = self.clone();
+        h.reverse();
+        hex::encode(h)
+    }
+}
+
+pub fn full_hash(hash: &[u8]) -> FullHash {
+    hash.try_into().expect("failed to convert into FullHash")
+}
 
 pub fn addr_to_scripthash(addr: &str) -> Result<FullHash> {
     let decoded = match Address::decode(addr) {
@@ -100,5 +119,12 @@ mod tests {
     #[test]
     fn test_addr_to_scripthash_garbage() {
         assert!(addr_to_scripthash("garbage").is_err());
+    }
+
+    #[test]
+    fn test_to_le_hex() {
+        let hex = "829ce9ce75a8a8a01bf27a7365655506614ef0b8f5a7ecbef19093951a73b686";
+        let scripthash: FullHash = decode_scripthash(hex).unwrap();
+        assert_eq!(hex, scripthash.to_le_hex());
     }
 }
