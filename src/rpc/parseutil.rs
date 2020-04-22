@@ -1,5 +1,33 @@
 use crate::errors::*;
+use bitcoin_hashes::hex::FromHex;
+use bitcoin_hashes::sha256d::Hash as Sha256dHash;
 use serde_json::Value;
+
+pub fn bool_from_value(val: Option<&Value>, name: &str) -> Result<bool> {
+    let val = val.chain_err(|| rpc_arg_error(&format!("missing {}", name)))?;
+    let val = val
+        .as_bool()
+        .chain_err(|| rpc_arg_error(&format!("not a bool {}", name)))?;
+    Ok(val)
+}
+
+pub fn bool_from_value_or(val: Option<&Value>, name: &str, default: bool) -> Result<bool> {
+    if val.is_none() {
+        return Ok(default);
+    }
+    bool_from_value(val, name)
+}
+
+// TODO: Sha256dHash should be a generic hash-container (since script hash is single SHA256)
+pub fn hash_from_value(val: Option<&Value>) -> Result<Sha256dHash> {
+    let script_hash = val.chain_err(|| rpc_arg_error("missing hash"))?;
+    let script_hash = script_hash
+        .as_str()
+        .chain_err(|| rpc_arg_error("non-string hash"))?;
+    let script_hash =
+        Sha256dHash::from_hex(script_hash).chain_err(|| rpc_arg_error("non-hex hash"))?;
+    Ok(script_hash)
+}
 
 pub fn rpc_arg_error(what: &str) -> ErrorKind {
     ErrorKind::RpcError(RpcErrorCode::InvalidParams, what.to_string())
@@ -11,4 +39,19 @@ pub fn str_from_value(val: Option<&Value>, name: &str) -> Result<String> {
         .as_str()
         .chain_err(|| rpc_arg_error(&format!("{} is not a string", name)))?;
     Ok(string.into())
+}
+
+pub fn usize_from_value(val: Option<&Value>, name: &str) -> Result<usize> {
+    let val = val.chain_err(|| rpc_arg_error(&format!("missing {}", name)))?;
+    let val = val
+        .as_u64()
+        .chain_err(|| rpc_arg_error(&format!("non-integer {}", name)))?;
+    Ok(val as usize)
+}
+
+pub fn usize_from_value_or(val: Option<&Value>, name: &str, default: usize) -> Result<usize> {
+    if val.is_none() {
+        return Ok(default);
+    }
+    usize_from_value(val, name)
 }

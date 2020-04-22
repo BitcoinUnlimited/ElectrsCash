@@ -1,6 +1,6 @@
 use bitcoin::blockdata::transaction::Transaction;
 use bitcoin::consensus::encode::{deserialize, serialize};
-use bitcoin_hashes::hex::{FromHex, ToHex};
+use bitcoin_hashes::hex::ToHex;
 use bitcoin_hashes::sha256d::Hash as Sha256dHash;
 use bitcoin_hashes::Hash;
 use error_chain::ChainedError;
@@ -20,7 +20,9 @@ use crate::index::compute_script_hash;
 use crate::mempool::MEMPOOL_HEIGHT;
 use crate::metrics::{Gauge, HistogramOpts, HistogramVec, MetricOpts, Metrics};
 use crate::query::{Query, Status};
-use crate::rpc::parseutil::rpc_arg_error;
+use crate::rpc::parseutil::{
+    bool_from_value_or, hash_from_value, rpc_arg_error, usize_from_value, usize_from_value_or,
+};
 use crate::rpc::server::{
     server_add_peer, server_banner, server_donation_address, server_features,
     server_peers_subscribe, server_version,
@@ -31,47 +33,6 @@ use crate::util::{spawn_thread, Channel, HeaderEntry, SyncChannel};
 
 pub mod parseutil;
 pub mod server;
-
-// TODO: Sha256dHash should be a generic hash-container (since script hash is single SHA256)
-fn hash_from_value(val: Option<&Value>) -> Result<Sha256dHash> {
-    let script_hash = val.chain_err(|| rpc_arg_error("missing hash"))?;
-    let script_hash = script_hash
-        .as_str()
-        .chain_err(|| rpc_arg_error("non-string hash"))?;
-    let script_hash =
-        Sha256dHash::from_hex(script_hash).chain_err(|| rpc_arg_error("non-hex hash"))?;
-    Ok(script_hash)
-}
-
-fn usize_from_value(val: Option<&Value>, name: &str) -> Result<usize> {
-    let val = val.chain_err(|| rpc_arg_error(&format!("missing {}", name)))?;
-    let val = val
-        .as_u64()
-        .chain_err(|| rpc_arg_error(&format!("non-integer {}", name)))?;
-    Ok(val as usize)
-}
-
-fn usize_from_value_or(val: Option<&Value>, name: &str, default: usize) -> Result<usize> {
-    if val.is_none() {
-        return Ok(default);
-    }
-    usize_from_value(val, name)
-}
-
-fn bool_from_value(val: Option<&Value>, name: &str) -> Result<bool> {
-    let val = val.chain_err(|| rpc_arg_error(&format!("missing {}", name)))?;
-    let val = val
-        .as_bool()
-        .chain_err(|| rpc_arg_error(&format!("not a bool {}", name)))?;
-    Ok(val)
-}
-
-fn bool_from_value_or(val: Option<&Value>, name: &str, default: bool) -> Result<bool> {
-    if val.is_none() {
-        return Ok(default);
-    }
-    bool_from_value(val, name)
-}
 
 fn unspent_from_status(status: &Status) -> Value {
     json!(Value::Array(
