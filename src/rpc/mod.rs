@@ -16,7 +16,6 @@ use std::time::Duration;
 
 use crate::def::PROTOCOL_VERSION_MAX;
 use crate::errors::*;
-use crate::index::compute_script_hash;
 use crate::mempool::MEMPOOL_HEIGHT;
 use crate::metrics::{Gauge, HistogramOpts, HistogramVec, MetricOpts, Metrics};
 use crate::query::{Query, Status};
@@ -27,6 +26,7 @@ use crate::rpc::server::{
     server_add_peer, server_banner, server_donation_address, server_features,
     server_peers_subscribe, server_version,
 };
+use crate::scripthashutil::compute_script_hash;
 use crate::timeout::TimeoutTrigger;
 use crate::util::FullHash;
 use crate::util::{spawn_thread, Channel, HeaderEntry, SyncChannel};
