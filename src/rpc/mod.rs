@@ -111,6 +111,9 @@ impl Connection {
             "blockchain.scripthash.subscribe" => {
                 self.blockchainrpc.scripthash_subscribe(&params, &timeout)
             }
+            "blockchain.scripthash.unsubscribe" => {
+                self.blockchainrpc.scripthash_unsubscribe(&params)
+            }
             "blockchain.transaction.broadcast" => self.blockchainrpc.transaction_broadcast(&params),
             "blockchain.transaction.get" => self.blockchainrpc.transaction_get(&params),
             "blockchain.transaction.get_merkle" => {

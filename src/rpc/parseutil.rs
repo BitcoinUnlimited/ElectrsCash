@@ -21,10 +21,10 @@ pub fn bool_from_value_or(val: Option<&Value>, name: &str, default: bool) -> Res
 }
 
 pub fn scripthash_from_value(val: Option<&Value>) -> Result<FullHash> {
-    let script_hash = val.chain_err(|| rpc_arg_error("missing hash"))?;
+    let script_hash = val.chain_err(|| rpc_arg_error("missing scripthash"))?;
     let script_hash = script_hash
         .as_str()
-        .chain_err(|| rpc_arg_error("non-string hash"))?;
+        .chain_err(|| rpc_arg_error("non-string scripthash"))?;
     let script_hash =
         decode_scripthash(script_hash).chain_err(|| rpc_arg_error("invalid scripthash"))?;
     Ok(script_hash)
