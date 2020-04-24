@@ -3,16 +3,16 @@ use crate::mempool::MEMPOOL_HEIGHT;
 use crate::metrics::{Gauge, HistogramOpts, HistogramVec, MetricOpts, Metrics};
 use crate::query::{Query, Status};
 use crate::rpc::parseutil::{
-    bool_from_value_or, hash_from_value, rpc_arg_error, usize_from_value, usize_from_value_or,
+    bool_from_value_or, rpc_arg_error, scripthash_from_value, sha256d_from_value, usize_from_value,
+    usize_from_value_or,
 };
+use crate::scripthash::{FullHash, ToLEHex};
 use crate::timeout::TimeoutTrigger;
-use crate::util::FullHash;
 use crate::util::HeaderEntry;
 use bitcoin::blockdata::transaction::Transaction;
 use bitcoin::consensus::encode::{deserialize, serialize};
 use bitcoin_hashes::hex::ToHex;
 use bitcoin_hashes::sha256d::Hash as Sha256dHash;
-use bitcoin_hashes::Hash;
 use hex;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -42,7 +42,7 @@ struct BlockchainRPCStats {
 pub struct BlockchainRPC {
     query: Arc<Query>,
     stats: BlockchainRPCStats,
-    status_hashes: HashMap<Sha256dHash, Value>, // ScriptHash -> StatusHash
+    status_hashes: HashMap<FullHash, Value>, // ScriptHash -> StatusHash
     last_header_entry: Option<HeaderEntry>,
     relayfee: f64,
     rpc_timeout: u16,
@@ -161,23 +161,17 @@ impl BlockchainRPC {
         params: &[Value],
         timeout: &TimeoutTrigger,
     ) -> Result<Value> {
-        let script_hash = hash_from_value(params.get(0))?;
-        let status = self.query.status(&script_hash[..], timeout)?;
+        let script_hash = scripthash_from_value(params.get(0))?;
+        let status = self.query.status(&script_hash, timeout)?;
         Ok(
             json!({ "confirmed": status.confirmed_balance(), "unconfirmed": status.mempool_balance() }),
         )
     }
 
     pub fn scripthash_get_first_use(&self, params: &[Value]) -> Result<Value> {
-        let scripthash = hash_from_value(params.get(0)).chain_err(|| "bad script_hash")?;
+        let scripthash = scripthash_from_value(params.get(0)).chain_err(|| "bad script_hash")?;
 
-        let to_fullhash = |h: &Sha256dHash| -> [u8; 32] {
-            let mut res = [0; 32];
-            res[..].copy_from_slice(&h[..]);
-            res
-        };
-
-        let firstuse = self.query.scripthash_first_use(&to_fullhash(&scripthash))?;
+        let firstuse = self.query.scripthash_first_use(&scripthash)?;
         if firstuse.0 == 0 {
             return Err(ErrorKind::RpcError(
                 RpcErrorCode::NotFound,
@@ -209,8 +203,8 @@ impl BlockchainRPC {
         params: &[Value],
         timeout: &TimeoutTrigger,
     ) -> Result<Value> {
-        let script_hash = hash_from_value(params.get(0))?;
-        let status = self.query.status(&script_hash[..], timeout)?;
+        let script_hash = scripthash_from_value(params.get(0))?;
+        let status = self.query.status(&script_hash, timeout)?;
         Ok(json!(Value::Array(
             status
                 .history()
@@ -225,9 +219,9 @@ impl BlockchainRPC {
         params: &[Value],
         timeout: &TimeoutTrigger,
     ) -> Result<Value> {
-        let script_hash = hash_from_value(params.get(0))?;
+        let script_hash = scripthash_from_value(params.get(0))?;
         Ok(unspent_from_status(
-            &self.query.status(&script_hash[..], timeout)?,
+            &self.query.status(&script_hash, timeout)?,
         ))
     }
 
@@ -236,8 +230,8 @@ impl BlockchainRPC {
         params: &[Value],
         timeout: &TimeoutTrigger,
     ) -> Result<Value> {
-        let script_hash = hash_from_value(params.get(0)).chain_err(|| "bad script_hash")?;
-        let status = self.query.status(&script_hash[..], timeout)?;
+        let script_hash = scripthash_from_value(params.get(0)).chain_err(|| "bad script_hash")?;
+        let status = self.query.status(&script_hash, timeout)?;
         let result = status.hash().map_or(Value::Null, |h| json!(hex::encode(h)));
         self.status_hashes.insert(script_hash, result.clone());
         self.stats
@@ -259,7 +253,7 @@ impl BlockchainRPC {
     }
 
     pub fn transaction_get(&self, params: &[Value]) -> Result<Value> {
-        let tx_hash = hash_from_value(params.get(0))?;
+        let tx_hash = sha256d_from_value(params.get(0))?;
         let verbose = match params.get(1) {
             Some(value) => value.as_bool().chain_err(|| "non-bool verbose value")?,
             None => false,
@@ -317,7 +311,7 @@ impl BlockchainRPC {
     }
 
     pub fn transaction_get_merkle(&self, params: &[Value]) -> Result<Value> {
-        let tx_hash = hash_from_value(params.get(0))?;
+        let tx_hash = sha256d_from_value(params.get(0))?;
         let height = usize_from_value(params.get(1), "height")?;
         let (merkle, pos) = self
             .query
@@ -373,8 +367,6 @@ impl BlockchainRPC {
     }
 
     pub fn on_scripthash_change(&mut self, scripthash: FullHash) -> Result<Option<Value>> {
-        let scripthash = Sha256dHash::from_slice(&scripthash[..]).expect("invalid scripthash");
-
         let old_statushash;
         match self.status_hashes.get(&scripthash) {
             Some(statushash) => {
@@ -392,7 +384,7 @@ impl BlockchainRPC {
             .start_timer();
 
         let timeout = TimeoutTrigger::new(Duration::from_secs(self.rpc_timeout as u64));
-        let status = self.query.status(&scripthash[..], &timeout)?;
+        let status = self.query.status(&scripthash, &timeout)?;
         let new_statushash = status.hash().map_or(Value::Null, |h| json!(hex::encode(h)));
         if new_statushash == *old_statushash {
             return Ok(None);
@@ -400,7 +392,7 @@ impl BlockchainRPC {
         let notification = Some(json!({
                     "jsonrpc": "2.0",
                     "method": "blockchain.scripthash.subscribe",
-                    "params": [scripthash.to_hex(), new_statushash]}));
+                    "params": [scripthash.to_le_hex(), new_statushash]}));
         self.status_hashes.insert(scripthash, new_statushash);
         timer.observe_duration();
         Ok(notification)

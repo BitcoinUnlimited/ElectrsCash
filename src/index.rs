@@ -15,12 +15,12 @@ use crate::errors::*;
 use crate::metrics::{
     Counter, Gauge, HistogramOpts, HistogramTimer, HistogramVec, MetricOpts, Metrics,
 };
-use crate::scripthashutil::compute_script_hash;
+use crate::scripthash::{compute_script_hash, full_hash, FullHash};
 use crate::signal::Waiter;
 use crate::store::{ReadStore, Row, WriteStore};
 use crate::util::{
-    full_hash, hash_prefix, spawn_thread, Bytes, FullHash, HashPrefix, HeaderEntry, HeaderList,
-    HeaderMap, SyncChannel, HASH_PREFIX_LEN,
+    hash_prefix, spawn_thread, Bytes, HashPrefix, HeaderEntry, HeaderList, HeaderMap, SyncChannel,
+    HASH_PREFIX_LEN,
 };
 
 #[derive(Serialize, Deserialize)]

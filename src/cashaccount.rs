@@ -1,7 +1,8 @@
 use crate::mempool::MEMPOOL_HEIGHT;
+use crate::scripthash::FullHash;
 use crate::store::ReadStore;
 use crate::store::Row;
-use crate::util::{hash_prefix, Bytes, FullHash, HashPrefix};
+use crate::util::{hash_prefix, Bytes, HashPrefix};
 use bincode;
 use bitcoin::blockdata::script::Script;
 use bitcoin::blockdata::transaction::Transaction;

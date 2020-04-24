@@ -16,10 +16,10 @@ use crate::errors::*;
 use crate::index::{TxInRow, TxOutRow, TxRow};
 use crate::mempool::{Tracker, MEMPOOL_HEIGHT};
 use crate::metrics::{HistogramOpts, HistogramVec, Metrics};
-use crate::scripthashutil::compute_script_hash;
+use crate::scripthash::{compute_script_hash, FullHash};
 use crate::store::{ReadStore, Row};
 use crate::timeout::TimeoutTrigger;
-use crate::util::{hash_prefix, FullHash, HashPrefix, HeaderEntry};
+use crate::util::{hash_prefix, HashPrefix, HeaderEntry};
 
 enum ConfirmationState {
     Confirmed,
@@ -385,7 +385,7 @@ impl Query {
 
     fn confirmed_status(
         &self,
-        script_hash: &[u8],
+        script_hash: &FullHash,
         timeout: &TimeoutTrigger,
     ) -> Result<(Vec<FundingOutput>, Vec<SpendingInput>)> {
         let mut spending = vec![];
@@ -421,7 +421,7 @@ impl Query {
 
     fn mempool_status(
         &self,
-        script_hash: &[u8],
+        script_hash: &FullHash,
         confirmed_funding: &[FundingOutput],
         timeout: &TimeoutTrigger,
     ) -> Result<(Vec<FundingOutput>, Vec<SpendingInput>)> {
@@ -450,7 +450,7 @@ impl Query {
         Ok((funding, spending))
     }
 
-    pub fn status(&self, script_hash: &[u8], timeout: &TimeoutTrigger) -> Result<Status> {
+    pub fn status(&self, script_hash: &FullHash, timeout: &TimeoutTrigger) -> Result<Status> {
         let timer = self
             .duration
             .with_label_values(&["confirmed_status"])

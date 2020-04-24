@@ -14,20 +14,13 @@ pub type Bytes = Vec<u8>;
 pub type HeaderMap = HashMap<Sha256dHash, BlockHeader>;
 
 // TODO: consolidate serialization/deserialize code for bincode/bitcoin.
-const HASH_LEN: usize = 32;
 pub const HASH_PREFIX_LEN: usize = 8;
-
-pub type FullHash = [u8; HASH_LEN];
 pub type HashPrefix = [u8; HASH_PREFIX_LEN];
 
 pub fn hash_prefix(hash: &[u8]) -> HashPrefix {
     hash[..HASH_PREFIX_LEN]
         .try_into()
         .expect("failed to convert into HashPrefix")
-}
-
-pub fn full_hash(hash: &[u8]) -> FullHash {
-    hash.try_into().expect("failed to convert into FullHash")
 }
 
 #[derive(Eq, PartialEq, Clone)]
