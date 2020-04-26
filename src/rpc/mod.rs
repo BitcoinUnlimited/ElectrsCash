@@ -26,6 +26,7 @@ use crate::util::{spawn_thread, Channel, HeaderEntry, SyncChannel};
 
 pub mod blockchain;
 pub mod parseutil;
+pub mod scripthash;
 pub mod server;
 
 fn get_output_scripthash(txn: &Transaction, n: Option<usize>) -> Vec<FullHash> {
@@ -91,6 +92,16 @@ impl Connection {
             .start_timer();
         let timeout = TimeoutTrigger::new(Duration::from_secs(self.rpc_timeout as u64));
         let result = match method {
+            "blockchain.address.get_balance" => {
+                self.blockchainrpc.address_get_balance(&params, &timeout)
+            }
+            "blockchain.address.get_first_use" => self.blockchainrpc.address_get_first_use(&params),
+            "blockchain.address.get_history" => {
+                self.blockchainrpc.address_get_history(&params, &timeout)
+            }
+            "blockchain.address.listunspent" => {
+                self.blockchainrpc.address_listunspent(&params, &timeout)
+            }
             "blockchain.block.header" => self.blockchainrpc.block_header(&params),
             "blockchain.block.headers" => self.blockchainrpc.block_headers(&params),
             "blockchain.estimatefee" => self.blockchainrpc.estimatefee(&params),
