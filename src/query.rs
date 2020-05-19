@@ -21,7 +21,7 @@ use crate::store::{ReadStore, Row};
 use crate::timeout::TimeoutTrigger;
 use crate::util::{hash_prefix, HashPrefix, HeaderEntry};
 
-enum ConfirmationState {
+pub enum ConfirmationState {
     Confirmed,
     InMempool,
     UnconfirmedParent,
@@ -32,7 +32,7 @@ pub struct FundingOutput {
     pub height: u32,
     pub output_index: usize,
     pub value: u64,
-    state: ConfirmationState,
+    pub state: ConfirmationState,
 }
 
 type OutPoint = (Sha256dHash, usize); // (txid, output_index)

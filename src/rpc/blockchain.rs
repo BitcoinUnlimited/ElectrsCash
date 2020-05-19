@@ -1,11 +1,12 @@
 use crate::errors::*;
-use crate::mempool::MEMPOOL_HEIGHT;
 use crate::metrics::{Gauge, HistogramOpts, HistogramVec, MetricOpts, Metrics};
-use crate::query::{Query, Status};
+use crate::query::Query;
 use crate::rpc::parseutil::{
-    bool_from_value_or, rpc_arg_error, scripthash_from_value, sha256d_from_value, usize_from_value,
-    usize_from_value_or,
+    bool_from_value_or, rpc_arg_error, scripthash_from_value, sha256d_from_value, str_from_value,
+    usize_from_value, usize_from_value_or,
 };
+use crate::rpc::scripthash::{get_balance, get_first_use, get_history, listunspent};
+use crate::scripthash::addr_to_scripthash;
 use crate::scripthash::{FullHash, ToLEHex};
 use crate::timeout::TimeoutTrigger;
 use crate::util::HeaderEntry;
@@ -18,21 +19,6 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
-
-fn unspent_from_status(status: &Status) -> Value {
-    json!(Value::Array(
-        status
-            .unspent()
-            .into_iter()
-            .map(|out| json!({
-                "height": out.height,
-                "tx_pos": out.output_index,
-                "tx_hash": out.txn_id.to_hex(),
-                "value": out.value,
-            }))
-            .collect()
-    ))
-}
 
 struct BlockchainRPCStats {
     subscriptions: Gauge,
@@ -76,6 +62,26 @@ impl BlockchainRPC {
             relayfee,
             rpc_timeout,
         }
+    }
+    pub fn address_get_balance(&self, params: &[Value], timeout: &TimeoutTrigger) -> Result<Value> {
+        let addr = str_from_value(params.get(0), "address")?;
+        let scripthash = addr_to_scripthash(&addr)?;
+        get_balance(&*self.query, &scripthash, timeout)
+    }
+    pub fn address_get_first_use(&self, params: &[Value]) -> Result<Value> {
+        let addr = str_from_value(params.get(0), "address")?;
+        let scripthash = addr_to_scripthash(&addr)?;
+        get_first_use(&*self.query, &scripthash)
+    }
+    pub fn address_get_history(&self, params: &[Value], timeout: &TimeoutTrigger) -> Result<Value> {
+        let addr = str_from_value(params.get(0), "address")?;
+        let scripthash = addr_to_scripthash(&addr)?;
+        get_history(&self.query, &scripthash, timeout)
+    }
+    pub fn address_listunspent(&self, params: &[Value], timeout: &TimeoutTrigger) -> Result<Value> {
+        let addr = str_from_value(params.get(0), "address")?;
+        let scripthash = addr_to_scripthash(&addr)?;
+        listunspent(&*self.query, &scripthash, timeout)
     }
 
     pub fn block_header(&self, params: &[Value]) -> Result<Value> {
@@ -161,41 +167,13 @@ impl BlockchainRPC {
         params: &[Value],
         timeout: &TimeoutTrigger,
     ) -> Result<Value> {
-        let script_hash = scripthash_from_value(params.get(0))?;
-        let status = self.query.status(&script_hash, timeout)?;
-        Ok(
-            json!({ "confirmed": status.confirmed_balance(), "unconfirmed": status.mempool_balance() }),
-        )
+        let scripthash = scripthash_from_value(params.get(0))?;
+        get_balance(&*self.query, &scripthash, timeout)
     }
 
     pub fn scripthash_get_first_use(&self, params: &[Value]) -> Result<Value> {
-        let scripthash = scripthash_from_value(params.get(0)).chain_err(|| "bad script_hash")?;
-
-        let firstuse = self.query.scripthash_first_use(&scripthash)?;
-        if firstuse.0 == 0 {
-            return Err(ErrorKind::RpcError(
-                RpcErrorCode::NotFound,
-                format!("scripthash '{}' not found", scripthash.to_hex()),
-            )
-            .into());
-        }
-        let hash = if firstuse.0 == MEMPOOL_HEIGHT {
-            Sha256dHash::default()
-        } else {
-            let h = self.query.get_headers(&[firstuse.0 as usize]);
-            if h.is_empty() {
-                warn!("expected to find header for height {}", firstuse.0);
-                Sha256dHash::default()
-            } else {
-                *h[0].hash()
-            }
-        };
-
-        Ok(json!({
-            "block_hash": hash.to_hex(),
-            "block_height": if firstuse.0 == MEMPOOL_HEIGHT { 0 } else { firstuse.0 },
-            "tx_hash": firstuse.1.to_hex()
-        }))
+        let scripthash = scripthash_from_value(params.get(0))?;
+        get_first_use(&*self.query, &scripthash)
     }
 
     pub fn scripthash_get_history(
@@ -203,15 +181,8 @@ impl BlockchainRPC {
         params: &[Value],
         timeout: &TimeoutTrigger,
     ) -> Result<Value> {
-        let script_hash = scripthash_from_value(params.get(0))?;
-        let status = self.query.status(&script_hash, timeout)?;
-        Ok(json!(Value::Array(
-            status
-                .history()
-                .into_iter()
-                .map(|item| json!({"height": item.0, "tx_hash": item.1.to_hex()}))
-                .collect()
-        )))
+        let scripthash = scripthash_from_value(params.get(0))?;
+        get_history(&self.query, &scripthash, timeout)
     }
 
     pub fn scripthash_listunspent(
@@ -219,10 +190,8 @@ impl BlockchainRPC {
         params: &[Value],
         timeout: &TimeoutTrigger,
     ) -> Result<Value> {
-        let script_hash = scripthash_from_value(params.get(0))?;
-        Ok(unspent_from_status(
-            &self.query.status(&script_hash, timeout)?,
-        ))
+        let scripthash = scripthash_from_value(params.get(0))?;
+        listunspent(&*self.query, &scripthash, timeout)
     }
 
     pub fn scripthash_subscribe(
