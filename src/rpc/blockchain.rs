@@ -2,7 +2,7 @@ use crate::errors::*;
 use crate::metrics::{Gauge, HistogramOpts, HistogramVec, MetricOpts, Metrics};
 use crate::query::Query;
 use crate::rpc::parseutil::{
-    bool_from_value_or, rpc_arg_error, scripthash_from_value, sha256d_from_value, str_from_value,
+    bool_from_value_or, hash_from_value, rpc_arg_error, scripthash_from_value, str_from_value,
     usize_from_value, usize_from_value_or,
 };
 use crate::rpc::scripthash::{get_balance, get_first_use, get_history, listunspent};
@@ -12,8 +12,8 @@ use crate::timeout::TimeoutTrigger;
 use crate::util::HeaderEntry;
 use bitcoin::blockdata::transaction::Transaction;
 use bitcoin::consensus::encode::{deserialize, serialize};
+use bitcoin::hash_types::{BlockHash, Txid};
 use bitcoin_hashes::hex::ToHex;
-use bitcoin_hashes::sha256d::Hash as Sha256dHash;
 use hex;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -228,7 +228,7 @@ impl BlockchainRPC {
     }
 
     pub fn transaction_get(&self, params: &[Value]) -> Result<Value> {
-        let tx_hash = sha256d_from_value(params.get(0))?;
+        let tx_hash = hash_from_value::<Txid>(params.get(0))?;
         let verbose = match params.get(1) {
             Some(value) => value.as_bool().chain_err(|| "non-bool verbose value")?,
             None => false,
@@ -261,7 +261,7 @@ impl BlockchainRPC {
 
             let tx_serialized = serialize(&tx);
             Ok(json!({
-                "blockhash": blockhash.unwrap_or(Sha256dHash::default()).to_hex(),
+                "blockhash": blockhash.unwrap_or(BlockHash::default()).to_hex(),
                 "blocktime": blocktime,
                 "height": height,
                 "confirmations": confirmations,
@@ -286,7 +286,7 @@ impl BlockchainRPC {
     }
 
     pub fn transaction_get_merkle(&self, params: &[Value]) -> Result<Value> {
-        let tx_hash = sha256d_from_value(params.get(0))?;
+        let tx_hash = hash_from_value::<Txid>(params.get(0))?;
         let height = usize_from_value(params.get(1), "height")?;
         let (merkle, pos) = self
             .query

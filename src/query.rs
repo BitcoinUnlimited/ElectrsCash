@@ -1,7 +1,8 @@
 use bitcoin::blockdata::transaction::Transaction;
 use bitcoin::consensus::encode::{deserialize, serialize};
+use bitcoin::hash_types::{BlockHash, TxMerkleNode, Txid};
+use bitcoin::hashes::sha256d::Hash as Sha256dHash;
 use bitcoin_hashes::hex::ToHex;
-use bitcoin_hashes::sha256d::Hash as Sha256dHash;
 use bitcoin_hashes::Hash;
 use crypto::digest::Digest;
 use crypto::sha2::Sha256;
@@ -28,17 +29,17 @@ pub enum ConfirmationState {
 }
 
 pub struct FundingOutput {
-    pub txn_id: Sha256dHash,
+    pub txn_id: Txid,
     pub height: u32,
     pub output_index: usize,
     pub value: u64,
     pub state: ConfirmationState,
 }
 
-type OutPoint = (Sha256dHash, usize); // (txid, output_index)
+type OutPoint = (Txid, usize); // (txid, output_index)
 
 struct SpendingInput {
-    txn_id: Sha256dHash,
+    txn_id: Txid,
     height: u32,
     funding_output: OutPoint,
     value: u64,
@@ -82,8 +83,8 @@ impl Status {
         calc_balance(&self.mempool)
     }
 
-    pub fn history(&self) -> Vec<(i32, Sha256dHash)> {
-        let mut txns_map = HashMap::<Sha256dHash, i32>::new();
+    pub fn history(&self) -> Vec<(i32, Txid)> {
+        let mut txns_map = HashMap::<Txid, i32>::new();
         for f in self.funding() {
             let height: i32 = match f.state {
                 ConfirmationState::Confirmed => f.height as i32,
@@ -101,7 +102,7 @@ impl Status {
             };
             txns_map.insert(s.txn_id, height as i32);
         }
-        let mut txns: Vec<(i32, Sha256dHash)> =
+        let mut txns: Vec<(i32, Txid)> =
             txns_map.into_iter().map(|item| (item.1, item.0)).collect();
         txns.sort_unstable_by(|a, b| {
             if a.0 == b.0 {
@@ -167,15 +168,12 @@ struct TxnHeight {
     height: u32,
 }
 
-fn merklize(left: Sha256dHash, right: Sha256dHash) -> Sha256dHash {
+fn merklize<T: Hash>(left: T, right: T) -> T {
     let data = [&left[..], &right[..]].concat();
-    Sha256dHash::hash(&data)
+    <T as Hash>::hash(&data)
 }
 
-fn create_merkle_branch_and_root(
-    mut hashes: Vec<Sha256dHash>,
-    mut index: usize,
-) -> (Vec<Sha256dHash>, Sha256dHash) {
+fn create_merkle_branch_and_root<T: Hash>(mut hashes: Vec<T>, mut index: usize) -> (Vec<T>, T) {
     let mut merkle = vec![];
     while hashes.len() > 1 {
         if hashes.len() % 2 != 0 {
@@ -194,7 +192,7 @@ fn create_merkle_branch_and_root(
 }
 
 // TODO: the functions below can be part of ReadStore.
-fn txrow_by_txid(store: &dyn ReadStore, txid: &Sha256dHash) -> Option<TxRow> {
+fn txrow_by_txid(store: &dyn ReadStore, txid: &Txid) -> Option<TxRow> {
     let key = TxRow::filter_full(&txid);
     let value = store.get(&key)?;
     Some(TxRow::from_row(&Row { key, value }))
@@ -218,7 +216,7 @@ fn txoutrows_by_script_hash(store: &dyn ReadStore, script_hash: &[u8]) -> Vec<Tx
 
 fn txids_by_funding_output(
     store: &dyn ReadStore,
-    txn_id: &Sha256dHash,
+    txn_id: &Txid,
     output_index: usize,
 ) -> Vec<HashPrefix> {
     store
@@ -266,7 +264,7 @@ impl Query {
         let mut txns = vec![];
         for txid_prefix in prefixes {
             for tx_row in txrows_by_prefix(store, txid_prefix) {
-                let txid: Sha256dHash = deserialize(&tx_row.key.txid).unwrap();
+                let txid: Txid = deserialize(&tx_row.key.txid).unwrap();
                 let txn = self.load_txn(&txid, None, Some(tx_row.height))?;
                 txns.push(TxnHeight {
                     txn,
@@ -331,7 +329,7 @@ impl Query {
         })
     }
 
-    fn check_confirmation_state(&self, txid: &Sha256dHash, height: u32) -> ConfirmationState {
+    fn check_confirmation_state(&self, txid: &Txid, height: u32) -> ConfirmationState {
         if height != MEMPOOL_HEIGHT {
             return ConfirmationState::Confirmed;
         }
@@ -474,7 +472,7 @@ impl Query {
 
     pub fn lookup_blockheader(
         &self,
-        tx_hash: &Sha256dHash,
+        tx_hash: &Txid,
         block_height: Option<u32>,
     ) -> Result<Option<HeaderEntry>> {
         if self.tracker.read().unwrap().get_txn(&tx_hash).is_some() {
@@ -506,7 +504,7 @@ impl Query {
         self.app.index().best_header()
     }
 
-    fn load_txn_from_cache(&self, txid: &Sha256dHash) -> Option<Transaction> {
+    fn load_txn_from_cache(&self, txid: &Txid) -> Option<Transaction> {
         if let Some(tx) = self.tracker.read().unwrap().get_txn(&txid) {
             return Some(tx);
         }
@@ -515,8 +513,8 @@ impl Query {
 
     fn load_txn_from_bitcoind(
         &self,
-        txid: &Sha256dHash,
-        blockhash: Option<&Sha256dHash>,
+        txid: &Txid,
+        blockhash: Option<&BlockHash>,
     ) -> Result<Transaction> {
         self.tx_cache.get_or_else(&txid, || {
             let value: Value = self
@@ -530,8 +528,8 @@ impl Query {
 
     pub fn load_txn(
         &self,
-        txid: &Sha256dHash,
-        blockhash: Option<&Sha256dHash>,
+        txid: &Txid,
+        blockhash: Option<&BlockHash>,
         blockheight: Option<u32>,
     ) -> Result<Transaction> {
         let _timer = self.duration.with_label_values(&["load_txn"]).start_timer();
@@ -539,7 +537,7 @@ impl Query {
             return Ok(tx);
         }
 
-        let hash: Option<Sha256dHash> = match blockhash {
+        let hash: Option<BlockHash> = match blockhash {
             Some(hash) => Some(*hash),
             None => match self.lookup_blockheader(txid, blockheight) {
                 Ok(header) => header.and_then(|h| Some(h.hash().clone())),
@@ -567,15 +565,15 @@ impl Query {
         Ok(last_header.chain_err(|| "no headers indexed")?.clone())
     }
 
-    pub fn getblocktxids(&self, blockhash: &Sha256dHash) -> Result<Vec<Sha256dHash>> {
+    pub fn getblocktxids(&self, blockhash: &BlockHash) -> Result<Vec<Txid>> {
         self.app.daemon().getblocktxids(blockhash)
     }
 
     pub fn get_merkle_proof(
         &self,
-        tx_hash: &Sha256dHash,
+        tx_hash: &Txid,
         height: usize,
-    ) -> Result<(Vec<Sha256dHash>, usize)> {
+    ) -> Result<(Vec<TxMerkleNode>, usize)> {
         let header_entry = self
             .app
             .index()
@@ -586,7 +584,11 @@ impl Query {
             .iter()
             .position(|txid| txid == tx_hash)
             .chain_err(|| format!("missing txid {}", tx_hash))?;
-        let (branch, _root) = create_merkle_branch_and_root(txids, pos);
+        let tx_nodes: Vec<TxMerkleNode> = txids
+            .into_iter()
+            .map(|txid| TxMerkleNode::from_inner(txid.into_inner()))
+            .collect();
+        let (branch, _root) = create_merkle_branch_and_root(tx_nodes, pos);
         Ok((branch, pos))
     }
 
@@ -609,13 +611,17 @@ impl Query {
         }
 
         let heights: Vec<usize> = (0..=cp_height).collect();
-        let header_hashes: Vec<Sha256dHash> = self
+        let header_hashes: Vec<BlockHash> = self
             .get_headers(&heights)
             .into_iter()
             .map(|h| *h.hash())
             .collect();
+        let merkle_nodes: Vec<Sha256dHash> = header_hashes
+            .iter()
+            .map(|block_hash| Sha256dHash::from_inner(block_hash.into_inner()))
+            .collect();
         assert_eq!(header_hashes.len(), heights.len());
-        Ok(create_merkle_branch_and_root(header_hashes, height))
+        Ok(create_merkle_branch_and_root(merkle_nodes, height))
     }
 
     pub fn get_id_from_pos(
@@ -623,7 +629,7 @@ impl Query {
         height: usize,
         tx_pos: usize,
         want_merkle: bool,
-    ) -> Result<(Sha256dHash, Vec<Sha256dHash>)> {
+    ) -> Result<(Txid, Vec<TxMerkleNode>)> {
         let header_entry = self
             .app
             .index()
@@ -635,19 +641,24 @@ impl Query {
             .get(tx_pos)
             .chain_err(|| format!("No tx in position #{} in block #{}", tx_pos, height))?;
 
+        let tx_nodes = txids
+            .into_iter()
+            .map(|txid| TxMerkleNode::from_inner(txid.into_inner()))
+            .collect();
+
         let branch = if want_merkle {
-            create_merkle_branch_and_root(txids, tx_pos).0
+            create_merkle_branch_and_root(tx_nodes, tx_pos).0
         } else {
             vec![]
         };
         Ok((txid, branch))
     }
 
-    pub fn broadcast(&self, txn: &Transaction) -> Result<Sha256dHash> {
+    pub fn broadcast(&self, txn: &Transaction) -> Result<Txid> {
         self.app.daemon().broadcast(txn)
     }
 
-    pub fn update_mempool(&self) -> Result<HashSet<Sha256dHash>> {
+    pub fn update_mempool(&self) -> Result<HashSet<Txid>> {
         let _timer = self
             .duration
             .with_label_values(&["update_mempool"])
@@ -717,7 +728,7 @@ impl Query {
     }
 
     /// Find first outputs to scripthash
-    pub fn scripthash_first_use(&self, scripthash: &FullHash) -> Result<(u32, Sha256dHash)> {
+    pub fn scripthash_first_use(&self, scripthash: &FullHash) -> Result<(u32, Txid)> {
         let get_tx = |store| {
             let rows = txoutrows_by_script_hash(store, scripthash);
             let mut txs: Vec<TxRow> = rows
@@ -730,7 +741,7 @@ impl Query {
 
             for txrow in txs.drain(..) {
                 // verify that tx contains scripthash as output
-                let txid = Sha256dHash::from_slice(&txrow.key.txid[..]).expect("invalid txid");
+                let txid = Txid::from_slice(&txrow.key.txid[..]).expect("invalid txid");
                 let tx = self.load_txn(&txid, None, Some(txrow.height))?;
 
                 for o in tx.output.iter() {
@@ -739,7 +750,7 @@ impl Query {
                     }
                 }
             }
-            Ok((0, Sha256dHash::default()))
+            Ok((0, Txid::default()))
         };
 
         // Look at blockchain first
