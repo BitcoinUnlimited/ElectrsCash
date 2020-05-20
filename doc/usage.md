@@ -24,6 +24,8 @@ $ cd ElectrsCash
 $ cargo build --release
 ```
 
+Note for Raspberry Pi 4 owners: the old versions of OS/toolchains produce broken binaries. Make sure to use latest OS! (see [issue](https://github.com/romanz/electrs/issues/226))
+
 ## Bitcoind configuration
 
 ### Bitcoin Unlimited
