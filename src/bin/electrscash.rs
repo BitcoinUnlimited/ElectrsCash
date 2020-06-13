@@ -7,7 +7,6 @@ extern crate log;
 use error_chain::ChainedError;
 use std::process;
 use std::sync::Arc;
-use std::time::Duration;
 
 use electrscash::{
     app::App,
@@ -112,7 +111,7 @@ fn run_server(config: &Config) -> Result<()> {
                 config.rpc_buffer_size,
             )),
         };
-        if let Err(err) = signal.wait(Duration::from_secs(5)) {
+        if let Err(err) = signal.wait(config.wait_duration) {
             info!("stopping server: {}", err);
             break;
         }
