@@ -12,10 +12,11 @@ use std::time::Duration;
 
 use crate::def::PROTOCOL_VERSION_MAX;
 use crate::errors::*;
-use crate::metrics::{HistogramOpts, HistogramVec, Metrics};
+use crate::metrics::{HistogramOpts, MetricOpts, Metrics};
 use crate::query::Query;
 use crate::rpc::blockchain::BlockchainRPC;
 use crate::rpc::parseutil::usize_from_value;
+use crate::rpc::rpcstats::RPCStats;
 use crate::rpc::server::{
     server_add_peer, server_banner, server_donation_address, server_features,
     server_peers_subscribe, server_version,
@@ -26,6 +27,7 @@ use crate::util::{spawn_thread, Channel, HeaderEntry, SyncChannel};
 
 pub mod blockchain;
 pub mod parseutil;
+pub mod rpcstats;
 pub mod scripthash;
 pub mod server;
 
@@ -45,7 +47,7 @@ struct Connection {
     stream: TcpStream,
     addr: SocketAddr,
     chan: SyncChannel<Message>,
-    stats: Arc<Stats>,
+    stats: Arc<RPCStats>,
     rpc_timeout: u16,
     blockchainrpc: BlockchainRPC,
 }
@@ -53,10 +55,9 @@ struct Connection {
 impl Connection {
     pub fn new(
         query: Arc<Query>,
-        metrics: Arc<Metrics>,
         stream: TcpStream,
         addr: SocketAddr,
-        stats: Arc<Stats>,
+        stats: Arc<RPCStats>,
         relayfee: f64,
         rpc_timeout: u16,
         buffer_size: usize,
@@ -68,7 +69,7 @@ impl Connection {
             chan: SyncChannel::new(buffer_size),
             stats: stats.clone(),
             rpc_timeout,
-            blockchainrpc: BlockchainRPC::new(query, metrics, relayfee, rpc_timeout),
+            blockchainrpc: BlockchainRPC::new(query, stats, relayfee, rpc_timeout),
         }
     }
 
@@ -303,10 +304,6 @@ pub struct RPC {
     query: Arc<Query>,
 }
 
-struct Stats {
-    latency: HistogramVec,
-}
-
 impl RPC {
     fn start_notifier(
         notification: Channel<Notification>,
@@ -373,12 +370,17 @@ impl RPC {
         rpc_timeout: u16,
         rpc_buffer_size: usize,
     ) -> RPC {
-        let stats = Arc::new(Stats {
+        let stats = Arc::new(RPCStats {
             latency: metrics.histogram_vec(
                 HistogramOpts::new("electrscash_electrum_rpc", "Electrum RPC latency (seconds)"),
                 &["method"],
             ),
+            subscriptions: metrics.gauge(MetricOpts::new(
+                "electrscash_scripthash_subscriptions",
+                "# of scripthash subscriptions for node",
+            )),
         });
+
         let notification = Channel::unbounded();
         RPC {
             notification: notification.sender(),
@@ -397,14 +399,12 @@ impl RPC {
                     let query = Arc::clone(&query);
                     let senders = Arc::clone(&senders);
                     let stats = Arc::clone(&stats);
-                    let metrics = Arc::clone(&metrics);
                     let garbage_sender = garbage_sender.clone();
 
                     let spawned = spawn_thread("peer", move || {
                         info!("[{}] connected peer", addr);
                         let conn = Connection::new(
                             query,
-                            metrics,
                             stream,
                             addr,
                             stats,
