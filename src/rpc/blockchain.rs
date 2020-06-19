@@ -1,10 +1,10 @@
 use crate::errors::*;
-use crate::metrics::{Gauge, HistogramOpts, HistogramVec, MetricOpts, Metrics};
 use crate::query::Query;
 use crate::rpc::parseutil::{
     bool_from_value_or, hash_from_value, rpc_arg_error, scripthash_from_value, str_from_value,
     usize_from_value, usize_from_value_or,
 };
+use crate::rpc::rpcstats::RPCStats;
 use crate::rpc::scripthash::{get_balance, get_first_use, get_history, listunspent};
 use crate::scripthash::addr_to_scripthash;
 use crate::scripthash::{FullHash, ToLEHex};
@@ -20,14 +20,9 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 
-struct BlockchainRPCStats {
-    subscriptions: Gauge,
-    latency: HistogramVec,
-}
-
 pub struct BlockchainRPC {
     query: Arc<Query>,
-    stats: BlockchainRPCStats,
+    stats: Arc<RPCStats>,
     status_hashes: HashMap<FullHash, Value>, // ScriptHash -> StatusHash
     last_header_entry: Option<HeaderEntry>,
     relayfee: f64,
@@ -37,23 +32,10 @@ pub struct BlockchainRPC {
 impl BlockchainRPC {
     pub fn new(
         query: Arc<Query>,
-        metrics: Arc<Metrics>,
+        stats: Arc<RPCStats>,
         relayfee: f64,
         rpc_timeout: u16,
     ) -> BlockchainRPC {
-        let stats = BlockchainRPCStats {
-            subscriptions: metrics.gauge(MetricOpts::new(
-                "electrscash_scripthash_subscriptions",
-                "# of scripthash subscriptions",
-            )),
-            latency: metrics.histogram_vec(
-                HistogramOpts::new(
-                    "electrscash_rpc_blockchain",
-                    "Electrum blockchain RPC latency (seconds)",
-                ),
-                &["method"],
-            ),
-        };
         BlockchainRPC {
             query,
             stats,
