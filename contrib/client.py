@@ -16,3 +16,23 @@ class Client:
         msg = json.dumps(req) + '\n'
         self.s.sendall(msg.encode('ascii'))
         return json.loads(self.f.readline())
+
+if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--port', action='store')
+    parser.add_argument('--server', action='store')
+    parser.add_argument('method')
+    parser.add_argument('args', nargs='*')
+    args = parser.parse_args()
+
+    port = 50001
+    if args.port:
+        port = args.port
+
+    server = "bitcoincash.network"
+    if args.server:
+        server = args.server
+
+    conn = Client((server, port))
+    print(conn.call(args.method, *args.args))
