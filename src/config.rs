@@ -1,6 +1,5 @@
 use bitcoin::network::constants::Network;
 use dirs::home_dir;
-use num_cpus;
 use std::convert::TryInto;
 use std::ffi::{OsStr, OsString};
 use std::fmt;
@@ -10,7 +9,6 @@ use std::net::ToSocketAddrs;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::Arc;
-use stderrlog;
 
 use crate::daemon::CookieGetter;
 use crate::errors::*;
@@ -19,6 +17,7 @@ const DEFAULT_SERVER_ADDRESS: [u8; 4] = [127, 0, 0, 1]; // by default, serve on 
 
 mod internal {
     #![allow(unused)]
+    #![allow(clippy::all)]
 
     include!(concat!(env!("OUT_DIR"), "/configure_me_config.rs"));
 }

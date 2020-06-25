@@ -16,7 +16,7 @@ pub trait ToLEHex {
 
 impl ToLEHex for FullHash {
     fn to_le_hex(&self) -> String {
-        let mut h = self.clone();
+        let mut h = *self;
         h.reverse();
         hex::encode(h)
     }

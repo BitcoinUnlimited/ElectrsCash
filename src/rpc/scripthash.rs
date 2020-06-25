@@ -114,8 +114,8 @@ mod tests {
 
     fn create_out(height: u32, txn_id: Txid) -> FundingOutput {
         FundingOutput {
-            txn_id: txn_id,
-            height: height,
+            txn_id,
+            height,
             output_index: 0,
             value: 2020,
             state: ConfirmationState::InMempool,

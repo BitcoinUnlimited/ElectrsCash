@@ -47,7 +47,7 @@ impl App {
         let new_block = *tip != self.daemon().getbestblockhash()?;
         if new_block {
             let (new_headers, new_tip) = self.index().update(self.write_store(), &signal)?;
-            *tip = new_tip.hash().clone();
+            *tip = *new_tip.hash();
             Ok((new_headers, Some(new_tip)))
         } else {
             Ok((vec![], None))

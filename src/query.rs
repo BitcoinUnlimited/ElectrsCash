@@ -57,13 +57,13 @@ fn calc_balance((funding, spending): &(Vec<FundingOutput>, Vec<SpendingInput>)) 
     funded as i64 - spent as i64
 }
 
-fn txn_has_output(txn: &Transaction, n: u64, scripthash_prefix: &HashPrefix) -> bool {
+fn txn_has_output(txn: &Transaction, n: u64, scripthash_prefix: HashPrefix) -> bool {
     let n = n as usize;
     if txn.output.len() - 1 < n {
         return false;
     }
     let hash = compute_script_hash(&txn.output[n].script_pubkey[..]);
-    hash_prefix(&hash) == *scripthash_prefix
+    hash_prefix(&hash) == scripthash_prefix
 }
 
 impl Status {
@@ -118,12 +118,12 @@ impl Status {
             let mut a_height = a.0;
             let mut b_height = b.0;
             if a_height <= 0 {
-                a_height = 0xEEEEEE + a_height.abs();
+                a_height = 0xEE_EEEE + a_height.abs();
             }
             if b_height <= 0 {
-                b_height = 0xEEEEEE + b_height.abs();
+                b_height = 0xEE_EEEE + b_height.abs();
             }
-            return a_height.cmp(&b_height);
+            a_height.cmp(&b_height)
         });
         txns
     }
@@ -368,7 +368,12 @@ impl Query {
 
     /// Lookup txrow using txid prefix, filter on output when there are
     /// multiple matches.
-    fn lookup_tx_by_outrow(&self, store: &dyn ReadStore, txout: &TxOutRow, timeout: &TimeoutTrigger) -> Result<TxRow> {
+    fn lookup_tx_by_outrow(
+        &self,
+        store: &dyn ReadStore,
+        txout: &TxOutRow,
+        timeout: &TimeoutTrigger,
+    ) -> Result<TxRow> {
         let mut txrows = txrows_by_prefix(store, txout.txid_prefix);
         if txrows.len() == 1 {
             return Ok(txrows.remove(0));
@@ -376,7 +381,7 @@ impl Query {
         for txrow in txrows {
             timeout.check()?;
             let tx = self.load_txn(&txrow.get_txid(), None, Some(txrow.height))?;
-            if txn_has_output(&tx, txout.get_output_index(), &txout.key.script_hash_prefix) {
+            if txn_has_output(&tx, txout.get_output_index(), txout.key.script_hash_prefix) {
                 return Ok(txrow);
             }
         }
@@ -542,7 +547,7 @@ impl Query {
         let hash: Option<BlockHash> = match blockhash {
             Some(hash) => Some(*hash),
             None => match self.lookup_blockheader(txid, blockheight) {
-                Ok(header) => header.and_then(|h| Some(h.hash().clone())),
+                Ok(header) => header.map(|h| *h.hash()),
                 Err(_) => None,
             },
         };
@@ -564,7 +569,7 @@ impl Query {
 
     pub fn get_best_header(&self) -> Result<HeaderEntry> {
         let last_header = self.app.index().best_header();
-        Ok(last_header.chain_err(|| "no headers indexed")?.clone())
+        Ok(last_header.chain_err(|| "no headers indexed")?)
     }
 
     pub fn getblocktxids(&self, blockhash: &BlockHash) -> Result<Vec<Txid>> {

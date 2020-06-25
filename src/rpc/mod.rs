@@ -470,7 +470,7 @@ impl RPC {
 
     pub fn notify_scripthash_subscriptions(
         &self,
-        headers_changed: &Vec<HeaderEntry>,
+        headers_changed: &[HeaderEntry],
         txs_changed: HashSet<Txid>,
     ) {
         let mut txn_done: HashSet<Txid> = HashSet::new();

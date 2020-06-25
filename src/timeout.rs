@@ -10,7 +10,7 @@ impl TimeoutTrigger {
     pub fn new(timeout: Duration) -> TimeoutTrigger {
         TimeoutTrigger {
             start: Instant::now(),
-            timeout: timeout,
+            timeout,
         }
     }
 

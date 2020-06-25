@@ -1,4 +1,3 @@
-use base64;
 use bitcoin::blockdata::block::{Block, BlockHeader};
 use bitcoin::blockdata::transaction::Transaction;
 use bitcoin::consensus::encode::{deserialize, serialize};
@@ -6,8 +5,6 @@ use bitcoin::hash_types::{BlockHash, Txid};
 use bitcoin::network::constants::Network;
 use bitcoin_hashes::hex::{FromHex, ToHex};
 use bitcoin_hashes::Hash;
-use glob;
-use hex;
 use serde_json::{from_str, from_value, Map, Value};
 use std::collections::{HashMap, HashSet};
 use std::io::{BufRead, BufReader, Lines, Write};
@@ -318,7 +315,7 @@ impl Daemon {
                 signal.clone(),
             )?),
             message_id: Counter::new(),
-            blocktxids_cache: blocktxids_cache,
+            blocktxids_cache,
             signal: signal.clone(),
             latency: metrics.histogram_vec(
                 HistogramOpts::new(
@@ -482,7 +479,7 @@ impl Daemon {
 
     pub fn getblockheaders(&self, heights: &[usize]) -> Result<Vec<BlockHeader>> {
         let params_list: Vec<Value> = heights
-            .into_iter()
+            .iter()
             .map(|height| json!([height.to_string(), /*verbose=*/ false]))
             .collect();
         let mut result = vec![];

@@ -1,6 +1,5 @@
 use bitcoin::blockdata::transaction::Transaction;
 use bitcoin::hash_types::Txid;
-use hex;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::iter::FromIterator;
 use std::ops::Bound;
@@ -18,7 +17,7 @@ use crate::util::Bytes;
 const VSIZE_BIN_WIDTH: u32 = 100_000; // in vbytes
 
 /// Fake height value used to signify that a transaction is in the memory pool.
-pub const MEMPOOL_HEIGHT: u32 = 0x7FFFFFFF;
+pub const MEMPOOL_HEIGHT: u32 = 0x7FFF_FFFF;
 
 struct MempoolStore {
     map: BTreeMap<Bytes, Vec<Bytes>>,
@@ -31,6 +30,7 @@ impl MempoolStore {
         }
     }
 
+    #[allow(clippy::redundant_closure)]
     fn add(&mut self, tx: &Transaction) {
         let rows = index_transaction(tx, MEMPOOL_HEIGHT as usize, None);
         for row in rows {
@@ -237,14 +237,14 @@ impl Tracker {
                 assert_eq!(tx.txid(), *txid);
                 self.add(txid, tx, entry);
             }
-            changed_txs = txids.iter().map(|txid| *txid.clone()).collect();
+            changed_txs = txids.iter().map(|txid| *(*txid)).collect();
         }
         timer.observe_duration();
 
         let timer = self.stats.start_timer("remove");
         for txid in old_txids.difference(&new_txids) {
             self.remove(txid);
-            changed_txs.insert(txid.clone());
+            changed_txs.insert(*txid);
         }
         timer.observe_duration();
 
