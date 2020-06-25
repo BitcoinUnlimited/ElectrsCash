@@ -60,9 +60,16 @@ pub fn get_first_use(query: &Query, scripthash: &FullHash) -> Result<Value> {
         }
     };
 
+    let height = if firstuse.0 == MEMPOOL_HEIGHT {
+        0
+    } else {
+        firstuse.0
+    };
+
     Ok(json!({
         "block_hash": blockhash.to_hex(),
-        "block_height": if firstuse.0 == MEMPOOL_HEIGHT { 0 } else { firstuse.0 },
+        "height": height,
+        "block_height": height, // deprecated
         "tx_hash": firstuse.1.to_hex()
     }))
 }
