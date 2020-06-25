@@ -1,7 +1,9 @@
 # ElectrsCash - Electrum Server in Rust
 
+
+[![license](https://img.shields.io/github/license/BitcoinUnlimited/ElectrsCash.svg)](https://github.com/BitcoinUnlimited/ElectrsCash/blob/master/LICENSE)
+![CI](https://github.com/BitcoinUnlimited/ElectrsCash/workflows/Rust/badge.svg?branch=master&event=push)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat-square)](http://makeapullrequest.com)
-[![Build Status](https://travis-ci.org/BitcoinUnlimited/ElectrsCash.svg?branch=master)](https://travis-ci.org/BitcoinUnlimited/ElectrsCash)
 
 An efficient implementation of Electrum Server.
 
@@ -18,7 +20,7 @@ thus preserving the privacy of the user's addresses and balances.
 
 ## Features
 
- * Supports Electrum protocol [v1.4.1](https://bitcoincash.network/electrum/)
+ * Supports Electrum protocol [v1.4.2](https://bitcoincash.network/electrum/)
  * Maintains an index over transaction inputs and outputs, allowing fast balance queries
  * Fast synchronization of the Bitcoin Cash blockchain on modest hardware
  * Low index storage overhead (~20%), relying on a local full node for transaction retrieval
