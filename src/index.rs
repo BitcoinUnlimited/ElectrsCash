@@ -1,4 +1,3 @@
-use bincode;
 use bitcoin::blockdata::block::{Block, BlockHeader};
 use bitcoin::blockdata::transaction::{Transaction, TxIn, TxOut};
 use bitcoin::consensus::encode::{deserialize, serialize};
@@ -89,7 +88,7 @@ fn encode_varint(value: u64) -> Vec<u8> {
     encoded.to_vec()
 }
 
-fn decode_varint(index: &Vec<u8>) -> u64 {
+fn decode_varint(index: &[u8]) -> u64 {
     unsigned_varint::decode::u64(&index[..]).unwrap().0
 }
 

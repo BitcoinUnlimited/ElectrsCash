@@ -38,7 +38,7 @@ fn best_match(client_min: &Version, client_max: &Version) -> String {
 }
 
 fn best_match_response(client_min: &Version, client_max: &Version) -> Value {
-    json!([versionstr(), best_match(client_min, client_max).to_string()])
+    json!([versionstr(), best_match(client_min, client_max)])
 }
 
 fn versionstr() -> String {

@@ -8,7 +8,6 @@ use std::iter::FromIterator;
 use std::slice;
 use std::sync::mpsc::{channel, sync_channel, Receiver, Sender, SyncSender};
 use std::thread;
-use time;
 
 pub type Bytes = Vec<u8>;
 pub type HeaderMap = HashMap<BlockHash, BlockHeader>;
@@ -118,7 +117,7 @@ impl HeaderList {
             .collect()
     }
 
-    pub fn apply(&mut self, new_headers: &Vec<HeaderEntry>, tip: BlockHash) {
+    pub fn apply(&mut self, new_headers: &[HeaderEntry], tip: BlockHash) {
         if tip == BlockHash::default() {
             assert!(new_headers.is_empty());
             self.heights.clear();
@@ -163,7 +162,8 @@ impl HeaderList {
             new_headers.len(),
             new_height
         );
-        self.headers.split_off(new_height); // keep [0..new_height) entries
+        // keep [0..new_height) entries
+        self.headers.truncate(new_height);
         assert_eq!(new_height, self.headers.len());
         for new_header in new_headers {
             assert_eq!(new_header.height(), self.headers.len());

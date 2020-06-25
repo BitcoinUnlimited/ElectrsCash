@@ -12,9 +12,8 @@ use crate::timeout::TimeoutTrigger;
 use crate::util::HeaderEntry;
 use bitcoin::blockdata::transaction::Transaction;
 use bitcoin::consensus::encode::{deserialize, serialize};
-use bitcoin::hash_types::{BlockHash, Txid};
+use bitcoin::hash_types::Txid;
 use bitcoin_hashes::hex::ToHex;
-use hex;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -238,12 +237,12 @@ impl BlockchainRPC {
                 }
                 None => 0,
             };
-            let blockhash = header.and_then(|h| Some(h.hash().clone()));
+            let blockhash = header.map(|h| *h.hash());
             let tx = self.query.load_txn(&tx_hash, blockhash.as_ref(), None)?;
 
             let tx_serialized = serialize(&tx);
             Ok(json!({
-                "blockhash": blockhash.unwrap_or(BlockHash::default()).to_hex(),
+                "blockhash": blockhash.unwrap_or_default().to_hex(),
                 "blocktime": blocktime,
                 "height": height,
                 "confirmations": confirmations,
