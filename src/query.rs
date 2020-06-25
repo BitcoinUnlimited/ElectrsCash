@@ -353,8 +353,9 @@ impl Query {
         &self,
         store: &dyn ReadStore,
         txoutrow: &TxOutRow,
+        timeout: &TimeoutTrigger,
     ) -> Result<FundingOutput> {
-        let txrow = self.lookup_tx_by_outrow(store, txoutrow)?;
+        let txrow = self.lookup_tx_by_outrow(store, txoutrow, timeout)?;
         let txid = txrow.get_txid();
         Ok(FundingOutput {
             txn_id: txid,
@@ -367,12 +368,13 @@ impl Query {
 
     /// Lookup txrow using txid prefix, filter on output when there are
     /// multiple matches.
-    fn lookup_tx_by_outrow(&self, store: &dyn ReadStore, txout: &TxOutRow) -> Result<TxRow> {
+    fn lookup_tx_by_outrow(&self, store: &dyn ReadStore, txout: &TxOutRow, timeout: &TimeoutTrigger) -> Result<TxRow> {
         let mut txrows = txrows_by_prefix(store, txout.txid_prefix);
         if txrows.len() == 1 {
             return Ok(txrows.remove(0));
         }
         for txrow in txrows {
+            timeout.check()?;
             let tx = self.load_txn(&txrow.get_txid(), None, Some(txrow.height))?;
             if txn_has_output(&tx, txout.get_output_index(), &txout.key.script_hash_prefix) {
                 return Ok(txrow);
@@ -392,7 +394,7 @@ impl Query {
         timeout.check()?;
         let funding: Result<Vec<FundingOutput>> = funding
             .iter()
-            .map(|outrow| self.txoutrow_to_fundingoutput(read_store, outrow))
+            .map(|outrow| self.txoutrow_to_fundingoutput(read_store, outrow, timeout))
             .collect();
 
         if let Err(e) = funding {
@@ -429,7 +431,7 @@ impl Query {
         let funding = txoutrows_by_script_hash(tracker.index(), script_hash);
         let funding: Result<Vec<FundingOutput>> = funding
             .iter()
-            .map(|outrow| self.txoutrow_to_fundingoutput(tracker.index(), outrow))
+            .map(|outrow| self.txoutrow_to_fundingoutput(tracker.index(), outrow, timeout))
             .collect();
         if let Err(e) = funding {
             return Err(e);
