@@ -32,7 +32,7 @@ thus preserving the privacy of the user's addresses and balances.
  * [CashAccount support](https://honest.cash/v2/dagur/fast-cashaccount-lookups-using-bitbox-and-electrum-4781)
  * Supports major Bitcoin Cash full nodes, in addition to [full integration with Bitcoin Unlimited](https://github.com/BitcoinUnlimited/BitcoinUnlimited/blob/release/doc/bu-electrum-integration.md)
  * Deterministic builds
- * Its the only electrum server with good integration tests coverage
+ * We're the only electrum server with good integration tests coverage (see Tests below)
 
 ## Usage
 
@@ -51,3 +51,7 @@ Integration tests are included in the [Bitcoin Unlimited test set](https://githu
 To run the tests, you need to:
 - [Clone and build Bitcoin Unlimited](https://github.com/BitcoinUnlimited/BitcoinUnlimited/blob/release/doc/build-unix.md).
 - run `./contrib/run_functional_tests.sh`.
+
+## Linters
+
+Code linting and formatting is enforced in the projects continuous integration. When contributing, please run `cargo clippy` to catch common mistakes and improve your code, as well as `cargo fmt` to format the code.
