@@ -189,7 +189,7 @@ impl BlockchainRPC {
         let script_hash = scripthash_from_value(params.get(0))?;
         let status = self.query.status(&script_hash, timeout)?;
         let result = status.hash().map_or(Value::Null, |h| json!(hex::encode(h)));
-        if let None = self.status_hashes.insert(script_hash, result.clone()) {
+        if self.status_hashes.insert(script_hash, result.clone()).is_none() {
             self.stats.subscriptions.inc();
         }
         Ok(result)
@@ -363,6 +363,6 @@ impl BlockchainRPC {
     }
 
     pub fn get_num_subscriptions(&self) -> i64 {
-        return self.status_hashes.len() as i64
+        self.status_hashes.len() as i64
     }
 }

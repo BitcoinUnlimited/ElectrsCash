@@ -182,6 +182,14 @@ impl Tracker {
         self.items.get(txid).map(|stats| stats.tx.clone())
     }
 
+    pub fn has_txn(&self, txid: &Txid) -> bool {
+        self.items.contains_key(txid)
+    }
+
+    pub fn get_fee(&self, txid: &Txid) -> Option<u64> {
+        self.items.get(txid).map(|stats| stats.entry.fee())
+    }
+
     pub fn contains(&self, txid: &Txid) -> bool {
         self.items.contains_key(txid)
     }
