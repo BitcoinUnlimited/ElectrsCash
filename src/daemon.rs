@@ -284,6 +284,7 @@ impl Counter {
 
 pub struct Daemon {
     daemon_dir: PathBuf,
+    blocks_dir: PathBuf,
     network: Network,
     conn: Mutex<Connection>,
     message_id: Counter, // for monotonic JSONRPC 'id'
@@ -296,8 +297,10 @@ pub struct Daemon {
 }
 
 impl Daemon {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         daemon_dir: &PathBuf,
+        blocks_dir: &PathBuf,
         daemon_rpc_addr: SocketAddr,
         cookie_getter: Arc<dyn CookieGetter>,
         network: Network,
@@ -307,6 +310,7 @@ impl Daemon {
     ) -> Result<Daemon> {
         let daemon = Daemon {
             daemon_dir: daemon_dir.clone(),
+            blocks_dir: blocks_dir.clone(),
             network,
             conn: Mutex::new(Connection::new(
                 daemon_rpc_addr,
@@ -359,6 +363,7 @@ impl Daemon {
     pub fn reconnect(&self) -> Result<Daemon> {
         Ok(Daemon {
             daemon_dir: self.daemon_dir.clone(),
+            blocks_dir: self.blocks_dir.clone(),
             network: self.network,
             conn: Mutex::new(self.conn.lock().unwrap().reconnect()?),
             message_id: Counter::new(),
@@ -370,9 +375,7 @@ impl Daemon {
     }
 
     pub fn list_blk_files(&self) -> Result<Vec<PathBuf>> {
-        let mut path = self.daemon_dir.clone();
-        path.push("blocks");
-        path.push("blk*.dat");
+        let path = self.blocks_dir.join("blk*.dat");
         info!("listing block files at {:?}", path);
         let mut paths: Vec<PathBuf> = glob::glob(path.to_str().unwrap())
             .chain_err(|| "failed to list blk*.dat files")?
