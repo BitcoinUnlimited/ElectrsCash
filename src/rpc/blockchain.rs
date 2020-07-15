@@ -59,6 +59,12 @@ impl BlockchainRPC {
         let scripthash = addr_to_scripthash(&addr)?;
         get_history(&self.query, &scripthash, timeout)
     }
+
+    pub fn address_get_scripthash(&self, params: &[Value]) -> Result<Value> {
+        let scripthash = addr_to_scripthash(&str_from_value(params.get(0), "address")?)?;
+        Ok(json!(scripthash.to_le_hex()))
+    }
+
     pub fn address_listunspent(&self, params: &[Value], timeout: &TimeoutTrigger) -> Result<Value> {
         let addr = str_from_value(params.get(0), "address")?;
         let scripthash = addr_to_scripthash(&addr)?;

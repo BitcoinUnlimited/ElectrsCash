@@ -100,6 +100,9 @@ impl Connection {
             "blockchain.address.get_history" => {
                 self.blockchainrpc.address_get_history(&params, &timeout)
             }
+            "blockchain.address.get_scripthash" => {
+                self.blockchainrpc.address_get_scripthash(&params)
+            }
             "blockchain.address.listunspent" => {
                 self.blockchainrpc.address_listunspent(&params, &timeout)
             }
