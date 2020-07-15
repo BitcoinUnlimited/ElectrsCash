@@ -1,11 +1,11 @@
 // TODO: network::socket::Socket needs to be reimplemented.
 
-use bitcoin::network::constants::Network;
-use bitcoin::network::message::NetworkMessage;
-use bitcoin::network::message_blockdata::InvType;
-use bitcoin::network::socket::Socket;
-use bitcoin::hash_types::Txid;
-use bitcoin::util::Error;
+use bitcoincash::network::constants::Network;
+use bitcoincash::network::message::NetworkMessage;
+use bitcoincash::network::message_blockdata::InvType;
+use bitcoincash::network::socket::Socket;
+use bitcoincash::hash_types::Txid;
+use bitcoincash::util::Error;
 
 use std::sync::mpsc::Sender;
 use std::thread;

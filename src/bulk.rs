@@ -1,6 +1,6 @@
-use bitcoin::blockdata::block::Block;
-use bitcoin::consensus::encode::{deserialize, Decodable};
-use bitcoin::hash_types::BlockHash;
+use bitcoincash::blockdata::block::Block;
+use bitcoincash::consensus::encode::{deserialize, Decodable};
+use bitcoincash::hash_types::BlockHash;
 use std::collections::HashSet;
 use std::fs;
 use std::io::Cursor;
@@ -19,7 +19,6 @@ use crate::metrics::{CounterVec, Histogram, HistogramOpts, HistogramVec, MetricO
 use crate::signal::Waiter;
 use crate::store::{DBStore, Row, WriteStore};
 use crate::util::{spawn_thread, HeaderList, SyncChannel};
-use bitcoin::BitcoinHash;
 
 struct Parser {
     magic: u32,
@@ -96,7 +95,7 @@ impl Parser {
         let timer = self.duration.with_label_values(&["index"]).start_timer();
         let cashaccount = CashAccountParser::new(Some(self.cashaccount_activation_height));
         for block in blocks {
-            let blockhash = block.bitcoin_hash();
+            let blockhash = block.block_hash();
             if let Some(header) = self.current_headers.header_by_blockhash(&blockhash) {
                 if self
                     .indexed_blockhashes
@@ -293,7 +292,7 @@ mod tests {
         let blocks = parse_blocks(raw_blocks, magic).unwrap();
         assert_eq!(blocks.len(), 2);
         assert_eq!(
-            blocks[1].bitcoin_hash().into_inner().to_vec(),
+            blocks[1].block_hash().into_inner().to_vec(),
             hex_decode("d55acd552414cc44a761e8d6b64a4d555975e208397281d115336fc500000000").unwrap()
         );
     }

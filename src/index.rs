@@ -1,8 +1,8 @@
-use bitcoin::blockdata::block::{Block, BlockHeader};
-use bitcoin::blockdata::transaction::{Transaction, TxIn, TxOut};
-use bitcoin::consensus::encode::{deserialize, serialize};
-use bitcoin::hash_types::{BlockHash, Txid};
 use bitcoin_hashes::Hash;
+use bitcoincash::blockdata::block::{Block, BlockHeader};
+use bitcoincash::blockdata::transaction::{Transaction, TxIn, TxOut};
+use bitcoincash::consensus::encode::{deserialize, serialize};
+use bitcoincash::hash_types::{BlockHash, Txid};
 use std::collections::{HashMap, HashSet};
 use std::iter::FromIterator;
 use std::sync::RwLock;
@@ -20,7 +20,6 @@ use crate::util::{
     hash_prefix, spawn_thread, Bytes, HashPrefix, HeaderEntry, HeaderList, HeaderMap, SyncChannel,
     HASH_PREFIX_LEN,
 };
-use bitcoin::BitcoinHash;
 
 #[derive(Serialize, Deserialize)]
 pub struct TxInKey {
@@ -225,7 +224,7 @@ pub fn index_block<'a>(
     height: usize,
     cashaccount: &'a CashAccountParser,
 ) -> impl 'a + Iterator<Item = Row> {
-    let blockhash = block.bitcoin_hash();
+    let blockhash = block.block_hash();
     // Persist block hash and header
     let row = Row {
         key: bincode::serialize(&BlockKey {
@@ -293,7 +292,7 @@ fn read_indexed_headers(store: &dyn ReadStore) -> HeaderList {
     assert_eq!(
         headers
             .last()
-            .map(BlockHeader::bitcoin_hash)
+            .map(BlockHeader::block_hash)
             .unwrap_or(null_hash),
         latest_blockhash
     );
@@ -451,7 +450,7 @@ impl Index {
             }
 
             let rows_iter = batch.iter().flat_map(|block| {
-                let blockhash = block.bitcoin_hash();
+                let blockhash = block.block_hash();
                 let height = *height_map
                     .get(&blockhash)
                     .unwrap_or_else(|| panic!("missing header for block {}", blockhash));

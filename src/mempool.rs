@@ -1,5 +1,5 @@
-use bitcoin::blockdata::transaction::Transaction;
-use bitcoin::hash_types::Txid;
+use bitcoincash::blockdata::transaction::Transaction;
+use bitcoincash::hash_types::Txid;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::iter::FromIterator;
 use std::ops::Bound;

@@ -1,5 +1,5 @@
-use bitcoin::blockdata::opcodes;
-use bitcoin::blockdata::script::{Builder, Script};
+use bitcoincash::blockdata::opcodes;
+use bitcoincash::blockdata::script::{Builder, Script};
 use bitcoincash_addr::{Address, HashType};
 use crypto::digest::Digest;
 use crypto::sha2::Sha256;

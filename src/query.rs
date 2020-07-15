@@ -1,9 +1,9 @@
-use bitcoin::blockdata::transaction::Transaction;
-use bitcoin::consensus::encode::{deserialize, serialize};
-use bitcoin::hash_types::{BlockHash, TxMerkleNode, Txid};
-use bitcoin::hashes::sha256d::Hash as Sha256dHash;
 use bitcoin_hashes::hex::ToHex;
 use bitcoin_hashes::Hash;
+use bitcoincash::blockdata::transaction::Transaction;
+use bitcoincash::consensus::encode::{deserialize, serialize};
+use bitcoincash::hash_types::{BlockHash, TxMerkleNode, Txid};
+use bitcoincash::hashes::sha256d::Hash as Sha256dHash;
 use crypto::digest::Digest;
 use crypto::sha2::Sha256;
 use serde_json::Value;
