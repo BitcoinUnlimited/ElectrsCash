@@ -274,10 +274,7 @@ impl Query {
             tx_cache,
             txid_limit,
             duration: metrics.histogram_vec(
-                HistogramOpts::new(
-                    "electrs_query_duration",
-                    "Time to update mempool (in seconds)",
-                ),
+                HistogramOpts::new("electrs_query_duration", "Request duration (in seconds)"),
                 &["type"],
             ),
         })
