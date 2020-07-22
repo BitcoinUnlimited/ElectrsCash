@@ -420,49 +420,64 @@ impl Index {
             new_headers.iter().map(|h| (*h.hash(), h.height())),
         );
 
-        let chan = SyncChannel::new(1);
+        let chan = SyncChannel::new(self.batch_size);
         let sender = chan.sender();
         let blockhashes: Vec<BlockHash> = new_headers.iter().map(|h| *h.hash()).collect();
-        let batch_size = self.batch_size;
         let fetcher = spawn_thread("fetcher", move || {
-            for chunk in blockhashes.chunks(batch_size) {
+            for blockhash in blockhashes.iter() {
                 sender
-                    .send(daemon.getblocks(&chunk))
+                    .send(Some(daemon.getblock(&blockhash)))
                     .expect("failed sending blocks to be indexed");
             }
             sender
-                .send(Ok(vec![]))
+                .send(None)
                 .expect("failed sending explicit end of stream");
         });
         let cashaccount = CashAccountParser::new(Some(self.cashaccount_activation_height));
+
+        let mut i = 0;
+        let mut prev_blockhash = None;
         loop {
             waiter.poll()?;
             let timer = self.stats.start_timer("fetch");
-            let batch = chan
+            let block = chan
                 .receiver()
                 .recv()
-                .expect("block fetch exited prematurely")?;
+                .expect("block fetch exited prematurely");
             timer.observe_duration();
-            if batch.is_empty() {
+            if block.is_none() {
                 break;
             }
+            let block = block.unwrap();
+            let block = block?;
 
-            let rows_iter = batch.iter().flat_map(|block| {
-                let blockhash = block.block_hash();
-                let height = *height_map
-                    .get(&blockhash)
-                    .unwrap_or_else(|| panic!("missing header for block {}", blockhash));
-
-                self.stats.update(block, height); // TODO: update stats after the block is indexed
-                index_block(block, height, &cashaccount)
-                    .chain(std::iter::once(last_indexed_block(&blockhash)))
-            });
+            let blockhash = block.block_hash();
+            let height = *height_map
+                .get(&blockhash)
+                .unwrap_or_else(|| panic!("missing header for block {}", blockhash));
 
             let timer = self.stats.start_timer("index+write");
-            store.write(rows_iter, false);
+            i += 1;
+            let indexed = index_block(&block, height, &cashaccount);
+            if i % 1000 == 0 {
+                // Occationally update the 'last indexed' marker. If indexing is
+                // interrupted, it will restart at last marker.
+                store.write(
+                    indexed.chain(std::iter::once(last_indexed_block(&blockhash))),
+                    false,
+                );
+            } else {
+                store.write(indexed, false);
+            };
             timer.observe_duration();
+            self.stats.update(&block, height);
+            prev_blockhash = Some(blockhash);
         }
+
         let timer = self.stats.start_timer("flush");
+        if let Some(h) = prev_blockhash {
+            store.write(std::iter::once(last_indexed_block(&h)), false);
+        }
         store.flush(); // make sure no row is left behind
         timer.observe_duration();
 
