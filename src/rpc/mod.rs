@@ -5,7 +5,7 @@ use serde_json::{from_str, Value};
 use std::collections::{HashMap, HashSet};
 use std::io::{BufRead, BufReader, Write};
 use std::net::{Shutdown, SocketAddr, TcpListener, TcpStream};
-use std::sync::mpsc::{Sender, SyncSender, TrySendError};
+use std::sync::mpsc::{self, Receiver, Sender, SyncSender, TrySendError};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
@@ -23,7 +23,7 @@ use crate::rpc::server::{
 };
 use crate::scripthash::{compute_script_hash, FullHash};
 use crate::timeout::TimeoutTrigger;
-use crate::util::{spawn_thread, Channel, HeaderEntry, SyncChannel};
+use crate::util::{spawn_thread, Channel, HeaderEntry};
 
 pub mod blockchain;
 pub mod parseutil;
@@ -46,7 +46,7 @@ struct Connection {
     query: Arc<Query>,
     stream: TcpStream,
     addr: SocketAddr,
-    chan: SyncChannel<Message>,
+    chan: SyncSender<Message>,
     stats: Arc<RPCStats>,
     rpc_timeout: u16,
     blockchainrpc: BlockchainRPC,
@@ -60,13 +60,13 @@ impl Connection {
         stats: Arc<RPCStats>,
         relayfee: f64,
         rpc_timeout: u16,
-        buffer_size: usize,
+        chan: SyncSender<Message>,
     ) -> Connection {
         Connection {
             query: query.clone(),
             stream,
             addr,
-            chan: SyncChannel::new(buffer_size),
+            chan,
             stats: stats.clone(),
             rpc_timeout,
             blockchainrpc: BlockchainRPC::new(query, stats, relayfee, rpc_timeout),
@@ -201,10 +201,11 @@ impl Connection {
         Ok(())
     }
 
-    fn handle_replies(&mut self) -> Result<()> {
+    fn handle_replies(&mut self, receiver: Receiver<Message>) -> Result<()> {
         let empty_params = json!([]);
         loop {
-            let msg = self.chan.receiver().recv().chain_err(|| "channel closed")?;
+            let msg = receiver.recv().chain_err(|| "channel closed")?;
+            trace!("RPC {:?}", msg);
             match msg {
                 Message::Request(line) => {
                     trace!("RPC {:?}", line);
@@ -268,12 +269,12 @@ impl Connection {
         }
     }
 
-    pub fn run(mut self) {
+    pub fn run(mut self, receiver: Receiver<Message>) {
         let reader = BufReader::new(self.stream.try_clone().expect("failed to clone TcpStream"));
-        let tx = self.chan.sender();
+        let tx = self.chan.clone();
         let child = spawn_thread("reader", || Connection::handle_requests(reader, tx));
-        if let Err(e) = self.handle_replies() {
-            debug!(
+        if let Err(e) = self.handle_replies(receiver) {
+            error!(
                 "[{}] connection handling failed: {}",
                 self.addr,
                 e.display_chain().to_string()
@@ -404,9 +405,11 @@ impl RPC {
                 while let Some((stream, addr)) = acceptor.receiver().recv().unwrap() {
                     // explicitely scope the shadowed variables for the new thread
                     let query = Arc::clone(&query);
-                    let senders = Arc::clone(&senders);
                     let stats = Arc::clone(&stats);
                     let garbage_sender = garbage_sender.clone();
+                    let (sender, receiver) = mpsc::sync_channel(rpc_buffer_size);
+
+                    senders.lock().unwrap().push(sender.clone());
 
                     let spawned = spawn_thread("peer", move || {
                         info!("[{}] connected peer", addr);
@@ -417,10 +420,9 @@ impl RPC {
                             stats,
                             relayfee,
                             rpc_timeout,
-                            rpc_buffer_size,
+                            sender,
                         );
-                        senders.lock().unwrap().push(conn.chan.sender());
-                        conn.run();
+                        conn.run(receiver);
                         info!("[{}] disconnected peer", addr);
                         let _ = garbage_sender.send(std::thread::current().id());
                     });
