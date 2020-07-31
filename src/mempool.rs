@@ -223,7 +223,7 @@ impl Tracker {
                 match daemon.getmempoolentry(txid) {
                     Ok(entry) => Some((txid, entry)),
                     Err(err) => {
-                        warn!("no mempool entry {}: {}", txid, err); // e.g. new block or RBF
+                        debug!("no mempool entry {}: {}", txid, err); // e.g. new block or RBF
                         None // ignore this transaction for now
                     }
                 }
@@ -236,7 +236,7 @@ impl Tracker {
                 Err(err) => {
                     // e.g. new block or RBF
                     // keep the mempool until next update()
-                    warn!("failed to get transactions {:?}: {}", txids, err);
+                    debug!("failed to get transactions {:?}: {}", txids, err);
                     let empty: HashSet<Txid> = HashSet::new();
                     return Ok(empty);
                 }
