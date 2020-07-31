@@ -46,7 +46,7 @@ struct Connection {
     query: Arc<Query>,
     stream: TcpStream,
     addr: SocketAddr,
-    chan: SyncSender<Message>,
+    sender: SyncSender<Message>,
     stats: Arc<RPCStats>,
     rpc_timeout: u16,
     blockchainrpc: BlockchainRPC,
@@ -60,13 +60,13 @@ impl Connection {
         stats: Arc<RPCStats>,
         relayfee: f64,
         rpc_timeout: u16,
-        chan: SyncSender<Message>,
+        sender: SyncSender<Message>,
     ) -> Connection {
         Connection {
             query: query.clone(),
             stream,
             addr,
-            chan,
+            sender,
             stats: stats.clone(),
             rpc_timeout,
             blockchainrpc: BlockchainRPC::new(query, stats, relayfee, rpc_timeout),
@@ -241,7 +241,7 @@ impl Connection {
         }
     }
 
-    fn handle_requests(mut reader: BufReader<TcpStream>, tx: SyncSender<Message>) -> Result<()> {
+    fn parse_requests(mut reader: BufReader<TcpStream>, tx: SyncSender<Message>) -> Result<()> {
         loop {
             let mut line = Vec::<u8>::new();
             reader
@@ -271,8 +271,8 @@ impl Connection {
 
     pub fn run(mut self, receiver: Receiver<Message>) {
         let reader = BufReader::new(self.stream.try_clone().expect("failed to clone TcpStream"));
-        let tx = self.chan.clone();
-        let child = spawn_thread("reader", || Connection::handle_requests(reader, tx));
+        let sender = self.sender.clone();
+        let child = spawn_thread("reader", || Connection::parse_requests(reader, sender));
         if let Err(e) = self.handle_replies(receiver) {
             error!(
                 "[{}] connection handling failed: {}",
