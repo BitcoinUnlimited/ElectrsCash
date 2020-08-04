@@ -593,6 +593,14 @@ impl Query {
         self.load_txn_from_bitcoind(txid, hash.as_ref())
     }
 
+    pub fn get_confirmed_blockhash(&self, tx_hash: &Txid) -> Result<Value> {
+        let header = self.lookup_blockheader(tx_hash, None)?;
+        if header.is_none() {
+            bail!("tx {} is unconfirmed or does not exist", tx_hash);
+        }
+        Ok(json!({ "block_hash": header.unwrap().hash() }))
+    }
+
     pub fn get_headers(&self, heights: &[usize]) -> Vec<HeaderEntry> {
         let _timer = self
             .duration
