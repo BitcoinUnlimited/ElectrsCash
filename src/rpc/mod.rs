@@ -279,6 +279,9 @@ impl Connection {
                 e.display_chain().to_string()
             );
         }
+        self.stats
+            .subscriptions
+            .sub(self.blockchainrpc.get_num_subscriptions());
         debug!("[{}] shutting down connection", self.addr);
         let _ = self.stream.shutdown(Shutdown::Both);
         if let Err(err) = child.join().expect("receiver panicked") {
@@ -384,6 +387,7 @@ impl RPC {
             )),
         });
 
+        stats.subscriptions.set(0);
         let notification = Channel::unbounded();
         RPC {
             notification: notification.sender(),

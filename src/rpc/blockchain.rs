@@ -189,16 +189,18 @@ impl BlockchainRPC {
         let script_hash = scripthash_from_value(params.get(0))?;
         let status = self.query.status(&script_hash, timeout)?;
         let result = status.hash().map_or(Value::Null, |h| json!(hex::encode(h)));
-        self.status_hashes.insert(script_hash, result.clone());
-        self.stats
-            .subscriptions
-            .set(self.status_hashes.len() as i64);
+        if let None = self.status_hashes.insert(script_hash, result.clone()) {
+            self.stats.subscriptions.inc();
+        }
         Ok(result)
     }
 
     pub fn scripthash_unsubscribe(&mut self, params: &[Value]) -> Result<Value> {
         let scripthash = scripthash_from_value(params.get(0))?;
         let removed = self.status_hashes.remove(&scripthash).is_some();
+        if removed {
+            self.stats.subscriptions.dec();
+        }
         Ok(json!(removed))
     }
 
@@ -358,5 +360,9 @@ impl BlockchainRPC {
         self.status_hashes.insert(scripthash, new_statushash);
         timer.observe_duration();
         Ok(notification)
+    }
+
+    pub fn get_num_subscriptions(&self) -> i64 {
+        return self.status_hashes.len() as i64
     }
 }
