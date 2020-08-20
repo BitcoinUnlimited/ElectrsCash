@@ -24,4 +24,5 @@ then
 fi
 
 set -x # echo commands to terminal
+echo "(cd $BU_HOME; RUST_BACKTRACE=1 $TEST_RUNNER --electrum.exec=\"$ELECRSCASH_PATH\" --electrum-only)"
 (cd $BU_HOME; RUST_BACKTRACE=1 $TEST_RUNNER --electrum.exec="$ELECRSCASH_PATH" --electrum-only)

@@ -141,22 +141,21 @@ dependencies = [
 ]
 
 [[package]]
-name = "bitcoin"
-version = "0.23.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-dependencies = [
- "bech32 0.7.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "bitcoin_hashes 0.7.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "hex 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "secp256k1 0.17.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "serde 1.0.110 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
 name = "bitcoin_hashes"
 version = "0.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
+ "serde 1.0.110 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "bitcoincash"
+version = "0.23.0"
+source = "git+https://gitlab.com/rust-bitcoincash/rust-bitcoincash.git?tag=v0.23.0#3aeb13bdcc04c2bde6fc880e24690f5bc91956ee"
+dependencies = [
+ "bech32 0.7.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bitcoin_hashes 0.7.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "secp256k1 0.17.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.110 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -387,8 +386,8 @@ version = "1.1.1"
 dependencies = [
  "base64 0.10.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "bincode 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "bitcoin 0.23.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "bitcoin_hashes 0.7.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bitcoincash 0.23.0 (git+https://gitlab.com/rust-bitcoincash/rust-bitcoincash.git?tag=v0.23.0)",
  "bitcoincash-addr 0.5.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "c_fixed_string 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "cashaccount-sys 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1283,8 +1282,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum bincode 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "5753e2a71534719bf3f4e57006c3a4f0d2c672a4b676eec84161f763eca87dbf"
 "checksum bindgen 0.47.3 (registry+https://github.com/rust-lang/crates.io-index)" = "df683a55b54b41d5ea8ebfaebb5aa7e6b84e3f3006a78f010dadc9ca88469260"
 "checksum bindgen 0.48.1 (registry+https://github.com/rust-lang/crates.io-index)" = "9d3d411fd93fd296e613bdac1d16755a6a922a4738e1c8f6a5e13542c905f3ca"
-"checksum bitcoin 0.23.0 (registry+https://github.com/rust-lang/crates.io-index)" = "6a32c9d2fa897cfbb0db45d71e3d2838666194abc4828c0f994e4b5c3bf85ba4"
 "checksum bitcoin_hashes 0.7.6 (registry+https://github.com/rust-lang/crates.io-index)" = "b375d62f341cef9cd9e77793ec8f1db3fc9ce2e4d57e982c8fe697a2c16af3b6"
+"checksum bitcoincash 0.23.0 (git+https://gitlab.com/rust-bitcoincash/rust-bitcoincash.git?tag=v0.23.0)" = "<none>"
 "checksum bitcoincash-addr 0.5.2 (registry+https://github.com/rust-lang/crates.io-index)" = "ad79afbfd27efc52fc928b198a365a7ee9da8d881a18c16d88764880b675e543"
 "checksum bitflags 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "cf1de2fe8c75bc145a2f577add951f8134889b4795d47466a54a5c846d691693"
 "checksum blake2b_simd 0.5.10 (registry+https://github.com/rust-lang/crates.io-index)" = "d8fb2d74254a3a0b5cac33ac9f8ed0e44aa50378d9dbb2e5d83bd21ed1dc2c8a"

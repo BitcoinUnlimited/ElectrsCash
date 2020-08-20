@@ -1,4 +1,4 @@
-use bitcoin::hash_types::BlockHash;
+use bitcoincash::hash_types::BlockHash;
 use std::sync::{Arc, Mutex};
 
 use crate::util::HeaderEntry;

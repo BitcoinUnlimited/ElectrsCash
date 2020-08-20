@@ -3,9 +3,9 @@ use crate::scripthash::FullHash;
 use crate::store::ReadStore;
 use crate::store::Row;
 use crate::util::{hash_prefix, Bytes, HashPrefix};
-use bitcoin::blockdata::script::Script;
-use bitcoin::blockdata::transaction::Transaction;
-use bitcoin::hash_types::Txid;
+use bitcoincash::blockdata::script::Script;
+use bitcoincash::blockdata::transaction::Transaction;
+use bitcoincash::hash_types::Txid;
 use c_fixed_string::CFixedStr;
 use cashaccount_sys::{
     cashacc_account_destroy, cashacc_account_init, cashacc_parse_opreturn, CashAccount,

@@ -1,5 +1,5 @@
-use bitcoin::blockdata::transaction::Transaction;
-use bitcoin::hash_types::{BlockHash, Txid};
+use bitcoincash::blockdata::transaction::Transaction;
+use bitcoincash::hash_types::{BlockHash, Txid};
 use error_chain::ChainedError;
 use serde_json::{from_str, Value};
 use std::collections::{HashMap, HashSet};
