@@ -83,7 +83,7 @@ pub fn get_history(
         status
             .history()
             .into_iter()
-            .map(|item| json!({"height": item.0, "tx_hash": item.1.to_hex()}))
+            .map(|item| item.to_json())
             .collect()
     )))
 }

@@ -182,6 +182,14 @@ impl Tracker {
         self.items.get(txid).map(|stats| stats.tx.clone())
     }
 
+    pub fn has_txn(&self, txid: &Txid) -> bool {
+        self.items.contains_key(txid)
+    }
+
+    pub fn get_fee(&self, txid: &Txid) -> Option<u64> {
+        self.items.get(txid).map(|stats| stats.entry.fee())
+    }
+
     pub fn contains(&self, txid: &Txid) -> bool {
         self.items.contains_key(txid)
     }
@@ -215,7 +223,7 @@ impl Tracker {
                 match daemon.getmempoolentry(txid) {
                     Ok(entry) => Some((txid, entry)),
                     Err(err) => {
-                        warn!("no mempool entry {}: {}", txid, err); // e.g. new block or RBF
+                        debug!("no mempool entry {}: {}", txid, err); // e.g. new block or RBF
                         None // ignore this transaction for now
                     }
                 }
@@ -228,7 +236,7 @@ impl Tracker {
                 Err(err) => {
                     // e.g. new block or RBF
                     // keep the mempool until next update()
-                    warn!("failed to get transactions {:?}: {}", txids, err);
+                    debug!("failed to get transactions {:?}: {}", txids, err);
                     let empty: HashSet<Txid> = HashSet::new();
                     return Ok(empty);
                 }

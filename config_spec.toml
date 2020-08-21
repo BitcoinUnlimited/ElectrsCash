@@ -40,6 +40,11 @@ doc = "Data directory of Bitcoind (default: ~/.bitcoin/)"
 default = "crate::config::default_daemon_dir()"
 
 [[param]]
+name = "blocks_dir"
+type = "std::path::PathBuf"
+doc = "Analogous to bitcoind's -blocksdir option, this specifies the directory containing the raw blocks files (blk*.dat)"
+
+[[param]]
 name = "cookie"
 type = "String"
 doc = "JSONRPC authentication cookie ('USER:PASSWORD', default: read from cookie file)"
@@ -75,6 +80,12 @@ doc = "Prometheus monitoring 'addr:port' to listen on (default: 127.0.0.1:4224 f
 [[switch]]
 name = "jsonrpc_import"
 doc = "Use JSONRPC instead of directly importing blk*.dat files. Useful for remote full node or low memory system"
+
+[[param]]
+name = "wait_duration_secs"
+type = "u64"
+doc = "Duration to wait between bitcoind polling"
+default = "5"
 
 [[param]]
 name = "index_batch_size"

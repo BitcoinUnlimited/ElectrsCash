@@ -49,6 +49,7 @@ struct SpendingInput {
 pub struct Status {
     confirmed: (Vec<FundingOutput>, Vec<SpendingInput>),
     mempool: (Vec<FundingOutput>, Vec<SpendingInput>),
+    txn_fees: HashMap<Txid, u64>,
 }
 
 fn calc_balance((funding, spending): &(Vec<FundingOutput>, Vec<SpendingInput>)) -> i64 {
@@ -64,6 +65,25 @@ fn txn_has_output(txn: &Transaction, n: u64, scripthash_prefix: HashPrefix) -> b
     }
     let hash = compute_script_hash(&txn.output[n].script_pubkey[..]);
     hash_prefix(&hash) == scripthash_prefix
+}
+
+pub struct HistoryItem {
+    height: i32,
+    tx_hash: Txid,
+    fee: Option<u64>, // need to be set only for unconfirmed transactions (i.e. height <= 0)
+}
+
+impl HistoryItem {
+    pub fn to_json(&self) -> Value {
+        let mut result = json!({ "height": self.height, "tx_hash": self.tx_hash.to_hex()});
+        self.fee.map(|f| {
+            result
+                .as_object_mut()
+                .unwrap()
+                .insert("fee".to_string(), json!(f))
+        });
+        result
+    }
 }
 
 impl Status {
@@ -83,7 +103,7 @@ impl Status {
         calc_balance(&self.mempool)
     }
 
-    pub fn history(&self) -> Vec<(i32, Txid)> {
+    pub fn history(&self) -> Vec<HistoryItem> {
         let mut txns_map = HashMap::<Txid, i32>::new();
         for f in self.funding() {
             let height: i32 = match f.state {
@@ -102,21 +122,28 @@ impl Status {
             };
             txns_map.insert(s.txn_id, height as i32);
         }
-        let mut txns: Vec<(i32, Txid)> =
-            txns_map.into_iter().map(|item| (item.1, item.0)).collect();
-        txns.sort_unstable_by(|a, b| {
-            if a.0 == b.0 {
+        let mut items: Vec<HistoryItem> = txns_map
+            .into_iter()
+            .map(|item| HistoryItem {
+                height: item.1,
+                tx_hash: item.0,
+                fee: self.txn_fees.get(&item.0).cloned(),
+            })
+            .collect();
+
+        items.sort_unstable_by(|a, b| {
+            if a.height == b.height {
                 // Order by little endian tx hash if height is the same,
                 // in most cases, this order is the same as on the blockchain.
-                return b.1.cmp(&a.1);
+                return b.tx_hash.cmp(&a.tx_hash);
             }
-            if a.0 > 0 && b.0 > 0 {
-                return a.0.cmp(&b.0);
+            if a.height > 0 && b.height > 0 {
+                return a.height.cmp(&b.height);
             }
 
             // mempool txs should be sorted last, so add to it a large number
-            let mut a_height = a.0;
-            let mut b_height = b.0;
+            let mut a_height = a.height;
+            let mut b_height = b.height;
             if a_height <= 0 {
                 a_height = 0xEE_EEEE + a_height.abs();
             }
@@ -125,7 +152,7 @@ impl Status {
             }
             a_height.cmp(&b_height)
         });
-        txns
+        items
     }
 
     pub fn unspent(&self) -> Vec<&FundingOutput> {
@@ -153,8 +180,8 @@ impl Status {
         } else {
             let mut hash = FullHash::default();
             let mut sha2 = Sha256::new();
-            for (height, txn_id) in txns {
-                let part = format!("{}:{}:", txn_id.to_hex(), height);
+            for item in txns {
+                let part = format!("{}:{}:", item.tx_hash.to_hex(), item.height);
                 sha2.input(part.as_bytes());
             }
             sha2.result(&mut hash);
@@ -247,10 +274,7 @@ impl Query {
             tx_cache,
             txid_limit,
             duration: metrics.histogram_vec(
-                HistogramOpts::new(
-                    "electrs_query_duration",
-                    "Time to update mempool (in seconds)",
-                ),
+                HistogramOpts::new("electrs_query_duration", "Request duration (in seconds)"),
                 &["type"],
             ),
         })
@@ -429,9 +453,9 @@ impl Query {
         script_hash: &FullHash,
         confirmed_funding: &[FundingOutput],
         timeout: &TimeoutTrigger,
+        tracker: &Tracker,
     ) -> Result<(Vec<FundingOutput>, Vec<SpendingInput>)> {
         let mut spending = vec![];
-        let tracker = self.tracker.read().unwrap();
 
         let funding = txoutrows_by_script_hash(tracker.index(), script_hash);
         let funding: Result<Vec<FundingOutput>> = funding
@@ -465,16 +489,30 @@ impl Query {
             .chain_err(|| "failed to get confirmed status")?;
         timer.observe_duration();
 
+        let tracker = self.tracker.read().unwrap();
         let timer = self
             .duration
             .with_label_values(&["mempool_status"])
             .start_timer();
         let mempool = self
-            .mempool_status(script_hash, &confirmed.0, timeout)
+            .mempool_status(script_hash, &confirmed.0, timeout, &tracker)
             .chain_err(|| "failed to get mempool status")?;
         timer.observe_duration();
 
-        Ok(Status { confirmed, mempool })
+        let mut txn_fees = HashMap::new();
+        let funding_txn_ids = mempool.0.iter().map(|funding| funding.txn_id);
+        let spending_txn_ids = mempool.1.iter().map(|spending| spending.txn_id);
+        for mempool_txid in funding_txn_ids.chain(spending_txn_ids) {
+            tracker
+                .get_fee(&mempool_txid)
+                .map(|fee| txn_fees.insert(mempool_txid, fee));
+        }
+
+        Ok(Status {
+            confirmed,
+            mempool,
+            txn_fees,
+        })
     }
 
     pub fn lookup_blockheader(
@@ -482,7 +520,7 @@ impl Query {
         tx_hash: &Txid,
         block_height: Option<u32>,
     ) -> Result<Option<HeaderEntry>> {
-        if self.tracker.read().unwrap().get_txn(&tx_hash).is_some() {
+        if self.tracker.read().unwrap().has_txn(&tx_hash) {
             return Ok(None);
         }
         // Lookup in confirmed transactions' index

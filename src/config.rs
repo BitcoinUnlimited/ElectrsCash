@@ -9,6 +9,7 @@ use std::net::ToSocketAddrs;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::Arc;
+use std::time::Duration;
 
 use crate::daemon::CookieGetter;
 use crate::errors::*;
@@ -126,10 +127,12 @@ pub struct Config {
     pub network_type: Network,
     pub db_path: PathBuf,
     pub daemon_dir: PathBuf,
+    pub blocks_dir: PathBuf,
     pub daemon_rpc_addr: SocketAddr,
     pub electrum_rpc_addr: SocketAddr,
     pub monitoring_addr: SocketAddr,
     pub jsonrpc_import: bool,
+    pub wait_duration: Duration,
     pub index_batch_size: usize,
     pub bulk_index_threads: usize,
     pub tx_cache_size: usize,
@@ -151,6 +154,10 @@ fn default_daemon_dir() -> PathBuf {
     });
     home.push(".bitcoin");
     home
+}
+
+fn default_blocks_dir(daemon_dir: &Path) -> PathBuf {
+    daemon_dir.join("blocks")
 }
 
 fn create_cookie_getter(
@@ -231,6 +238,11 @@ impl Config {
             Network::Regtest => config.daemon_dir.push("regtest"),
         }
 
+        let daemon_dir = &config.daemon_dir;
+        let blocks_dir = config
+            .blocks_dir
+            .unwrap_or_else(|| default_blocks_dir(daemon_dir));
+
         let cookie_getter =
             create_cookie_getter(config.cookie, config.cookie_file, &config.daemon_dir);
 
@@ -261,10 +273,12 @@ impl Config {
             network_type: config.network,
             db_path: config.db_dir,
             daemon_dir: config.daemon_dir,
+            blocks_dir,
             daemon_rpc_addr,
             electrum_rpc_addr,
             monitoring_addr,
             jsonrpc_import: config.jsonrpc_import,
+            wait_duration: Duration::from_secs(config.wait_duration_secs),
             index_batch_size: config.index_batch_size,
             bulk_index_threads: config.bulk_index_threads,
             tx_cache_size: (config.tx_cache_size_mb * MB) as usize,
@@ -306,6 +320,7 @@ debug_struct! { Config,
     network_type,
     db_path,
     daemon_dir,
+    blocks_dir,
     daemon_rpc_addr,
     electrum_rpc_addr,
     monitoring_addr,
