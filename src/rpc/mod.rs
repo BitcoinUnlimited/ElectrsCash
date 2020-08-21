@@ -205,7 +205,6 @@ impl Connection {
         let empty_params = json!([]);
         loop {
             let msg = receiver.recv().chain_err(|| "channel closed")?;
-            trace!("RPC {:?}", msg);
             match msg {
                 Message::Request(line) => {
                     trace!("RPC {:?}", line);

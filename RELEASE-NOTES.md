@@ -1,5 +1,30 @@
 # Release notes
 
+## 2.0.0 (21 August 2020)
+* [bug] Fix deadlock on Ctrl+C (#89)
+* [bug] Update subscription statistics correctly (#89)
+* [contrib] Add generic client for testing RPC methods (#83)
+* [misc] Add a 'blocks-dir' option analogous to bitcoind's '-blocksdir' (#89)
+* [misc] Add configuration `wait-duration-secs` to set custom main loop wait duration
+* [misc] External notification of block update via SIGUSR1 (#78)
+* [misc] Improve rpc timeout trigger (#81)
+* [misc] Log progress while waiting for IBD (#76)
+* [misc] Switch from `bitcoin` crate dependency to `bitcoincash` (#88)
+* [rpc] Add `blockchain.address.get_balance` (#72)
+* [rpc] Add `blockchain.address.get_first_use`
+* [rpc] Add `blockchain.address.get_first_use` (#72)
+* [rpc] Add `blockchain.address.get_history` (#72)
+* [rpc] Add `blockchain.address.get_scripthash` (#85)
+* [rpc] Add `blockchain.address.listunspent` (#72)
+* [rpc] Add `blockchain.scripthash.unsubscribe` (#71)
+* [rpc] Show fee for unconfirmed transactions (#89)
+* [rpc] Update `blockchain.scripthash.get_first_use`
+
+### Breaking changes
+
+This release contains an RPC optimization that requires Bitcoin Unlimited v1.9
+or BCHN v22.0.0 and will not work with older versions.
+
 ## 1.1.1 (10 April 2020)
 * [bug] Fix protocol-negotiation in `server.version` response (#61)
 * [bug] Fix dropped notification due to full client buffer (#60)
