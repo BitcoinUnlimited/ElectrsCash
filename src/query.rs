@@ -598,7 +598,11 @@ impl Query {
         if header.is_none() {
             bail!("tx {} is unconfirmed or does not exist", tx_hash);
         }
-        Ok(json!({ "block_hash": header.unwrap().hash() }))
+        let header = header.unwrap();
+        Ok(json!({
+            "block_hash": header.hash(),
+            "block_height": header.height()
+        }))
     }
 
     pub fn get_headers(&self, heights: &[usize]) -> Vec<HeaderEntry> {
