@@ -131,6 +131,9 @@ impl Connection {
             }
             "blockchain.transaction.broadcast" => self.blockchainrpc.transaction_broadcast(&params),
             "blockchain.transaction.get" => self.blockchainrpc.transaction_get(&params),
+            "blockchain.transaction.get_confirmed_blockhash" => self
+                .blockchainrpc
+                .transaction_get_confirmed_blockhash(&params),
             "blockchain.transaction.get_merkle" => {
                 self.blockchainrpc.transaction_get_merkle(&params)
             }

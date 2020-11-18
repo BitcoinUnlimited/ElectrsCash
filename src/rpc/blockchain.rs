@@ -278,6 +278,11 @@ impl BlockchainRPC {
         }
     }
 
+    pub fn transaction_get_confirmed_blockhash(&self, params: &[Value]) -> Result<Value> {
+        let tx_hash = hash_from_value(params.get(0)).chain_err(|| "bad tx_hash")?;
+        self.query.get_confirmed_blockhash(&tx_hash)
+    }
+
     pub fn transaction_get_merkle(&self, params: &[Value]) -> Result<Value> {
         let tx_hash = hash_from_value::<Txid>(params.get(0))?;
         let height = usize_from_value(params.get(1), "height")?;
