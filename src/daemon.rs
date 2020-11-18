@@ -1,9 +1,9 @@
-use bitcoin_hashes::hex::{FromHex, ToHex};
-use bitcoin_hashes::Hash;
 use bitcoincash::blockdata::block::{Block, BlockHeader};
 use bitcoincash::blockdata::transaction::Transaction;
 use bitcoincash::consensus::encode::{deserialize, serialize};
 use bitcoincash::hash_types::{BlockHash, Txid};
+use bitcoincash::hashes::hex::{FromHex, ToHex};
+use bitcoincash::hashes::Hash;
 use bitcoincash::network::constants::Network;
 use serde_json::{from_str, from_value, Map, Value};
 use std::collections::{HashMap, HashSet};

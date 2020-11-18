@@ -4,7 +4,7 @@ use crate::def::{
 use crate::errors::*;
 use crate::query::Query;
 use crate::rpc::parseutil::{rpc_arg_error, str_from_value};
-use bitcoin_hashes::hex::ToHex;
+use bitcoincash::hashes::hex::ToHex;
 use serde_json::Value;
 use std::sync::Arc;
 
