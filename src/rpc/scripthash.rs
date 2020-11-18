@@ -4,8 +4,8 @@ use crate::query::FundingOutput;
 use crate::query::{Query, Status};
 use crate::scripthash::{FullHash, ToLEHex};
 use crate::timeout::TimeoutTrigger;
-use bitcoin_hashes::hex::ToHex;
 use bitcoincash::hash_types::BlockHash;
+use bitcoincash::hashes::hex::ToHex;
 use serde_json::Value;
 
 fn unspent_to_json(out: &FundingOutput) -> Value {
@@ -100,8 +100,8 @@ pub fn listunspent(
 mod tests {
     use super::*;
     use crate::query::ConfirmationState;
-    use bitcoin_hashes::hex::FromHex;
     use bitcoincash::hash_types::Txid;
+    use bitcoincash::hashes::hex::FromHex;
     use serde_json::from_str;
 
     #[derive(Serialize, Deserialize)]

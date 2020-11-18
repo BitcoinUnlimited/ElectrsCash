@@ -1,8 +1,8 @@
-use bitcoin_hashes::Hash;
 use bitcoincash::blockdata::block::{Block, BlockHeader};
 use bitcoincash::blockdata::transaction::{Transaction, TxIn, TxOut};
 use bitcoincash::consensus::encode::{deserialize, serialize};
 use bitcoincash::hash_types::{BlockHash, Txid};
+use bitcoincash::hashes::Hash;
 use std::collections::{HashMap, HashSet};
 use std::iter::FromIterator;
 use std::sync::RwLock;

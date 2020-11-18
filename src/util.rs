@@ -283,11 +283,10 @@ where
 mod tests {
     #[test]
     fn test_headers() {
-        use bitcoin_hashes::Hash;
+        use super::HeaderList;
         use bitcoincash::blockdata::block::BlockHeader;
         use bitcoincash::hash_types::{BlockHash, TxMerkleNode};
-
-        use super::HeaderList;
+        use bitcoincash::hashes::Hash;
 
         // Test an empty header list
         let null_hash = BlockHash::default();

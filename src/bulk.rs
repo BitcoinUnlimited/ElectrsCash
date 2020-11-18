@@ -278,7 +278,7 @@ pub fn index_blk_files(
 mod tests {
 
     use super::*;
-    use bitcoin_hashes::Hash;
+    use bitcoincash::hashes::Hash;
     use hex::decode as hex_decode;
 
     #[test]

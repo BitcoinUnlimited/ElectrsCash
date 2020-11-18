@@ -1,8 +1,8 @@
 use crate::errors::*;
 use crate::scripthash::decode_scripthash;
 use crate::scripthash::FullHash;
-use bitcoin_hashes::hex::FromHex;
-use bitcoin_hashes::Hash;
+use bitcoincash::hashes::hex::FromHex;
+use bitcoincash::hashes::Hash;
 use serde_json::Value;
 
 pub fn bool_from_value(val: Option<&Value>, name: &str) -> Result<bool> {
