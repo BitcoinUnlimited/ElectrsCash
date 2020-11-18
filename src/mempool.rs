@@ -291,9 +291,10 @@ fn electrum_fees(entries: &[&MempoolEntry]) -> Vec<(f32, u32)> {
     let mut histogram = vec![];
     let mut bin_size = 0;
     let mut last_fee_rate = 0.0;
+    let error_margin = 1.192_092_9e-7; // TODO: Replace with f32::EPSILON
     for e in entries.iter().rev() {
         let fee_rate = e.fee_per_vbyte();
-        if bin_size > VSIZE_BIN_WIDTH && last_fee_rate != fee_rate {
+        if bin_size > VSIZE_BIN_WIDTH && (last_fee_rate - fee_rate).abs() > error_margin {
             // vsize of transactions paying >= e.fee_per_vbyte()
             histogram.push((last_fee_rate, bin_size));
             bin_size = 0;
