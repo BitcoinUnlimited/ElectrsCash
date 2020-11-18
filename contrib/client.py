@@ -17,6 +17,19 @@ class Client:
         self.s.sendall(msg.encode('ascii'))
         return json.loads(self.f.readline())
 
+def guess_type(arg):
+    if arg.lower() == "true":
+        return True
+    if arg.lower() == "false":
+        return False
+    if arg.isdigit():
+        return int(arg)
+    try:
+        return float(arg)
+    except Exception as _:
+        pass
+    return arg
+
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
@@ -34,5 +47,7 @@ if __name__ == "__main__":
     if args.server:
         server = args.server
 
+    forward_args = map(guess_type, args.args)
+
     conn = Client((server, port))
-    print(conn.call(args.method, *args.args))
+    print(conn.call(args.method, *forward_args))
