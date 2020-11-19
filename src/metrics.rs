@@ -1,13 +1,12 @@
-use prometheus::{self, Encoder, IntGauge};
 use std::fs;
 use std::io;
 use std::net::SocketAddr;
 use std::thread;
 use std::time::Duration;
 
-pub use prometheus::{
-    GaugeVec, Histogram, HistogramOpts, HistogramTimer, HistogramVec, IntCounter as Counter,
-    IntCounterVec as CounterVec, IntGauge as Gauge, Opts as MetricOpts,
+use prometheus::{
+    self, Encoder, Gauge, GaugeVec, Histogram, HistogramVec, IntCounter, IntCounterVec, IntGauge,
+    IntGaugeVec, Opts,
 };
 
 use crate::errors::*;
@@ -26,32 +25,38 @@ impl Metrics {
         }
     }
 
-    pub fn counter(&self, opts: prometheus::Opts) -> Counter {
-        let c = Counter::with_opts(opts).unwrap();
+    pub fn counter_int(&self, opts: prometheus::Opts) -> IntCounter {
+        let c = IntCounter::with_opts(opts).unwrap();
         self.reg.register(Box::new(c.clone())).unwrap();
         c
     }
 
-    pub fn counter_vec(&self, opts: prometheus::Opts, labels: &[&str]) -> CounterVec {
-        let c = CounterVec::new(opts, labels).unwrap();
+    pub fn counter_int_vec(&self, opts: prometheus::Opts, labels: &[&str]) -> IntCounterVec {
+        let c = IntCounterVec::new(opts, labels).unwrap();
         self.reg.register(Box::new(c.clone())).unwrap();
         c
     }
 
-    pub fn gauge(&self, opts: prometheus::Opts) -> Gauge {
+    pub fn gauge_float(&self, opts: prometheus::Opts) -> Gauge {
         let g = Gauge::with_opts(opts).unwrap();
         self.reg.register(Box::new(g.clone())).unwrap();
         g
     }
 
-    pub fn gauge_vec(&self, opts: prometheus::Opts, labels: &[&str]) -> GaugeVec {
+    pub fn gauge_float_vec(&self, opts: prometheus::Opts, labels: &[&str]) -> GaugeVec {
         let g = GaugeVec::new(opts, labels).unwrap();
         self.reg.register(Box::new(g.clone())).unwrap();
         g
     }
 
+    pub fn gauge_int_vec(&self, opts: prometheus::Opts, labels: &[&str]) -> IntGaugeVec {
+        let g = IntGaugeVec::new(opts, labels).unwrap();
+        self.reg.register(Box::new(g.clone())).unwrap();
+        g
+    }
+
     pub fn gauge_int(&self, opts: prometheus::Opts) -> IntGauge {
-        let g = Gauge::with_opts(opts).unwrap();
+        let g = IntGauge::with_opts(opts).unwrap();
         self.reg.register(Box::new(g.clone())).unwrap();
         g
     }
@@ -130,18 +135,18 @@ fn parse_stats() -> Result<Stats> {
 }
 
 fn start_process_exporter(metrics: &Metrics) {
-    let rss = metrics.gauge(MetricOpts::new(
+    let rss = metrics.gauge_int(Opts::new(
         "electrscash_process_memory_rss",
         "Resident memory size [bytes]",
     ));
-    let cpu = metrics.gauge_vec(
-        MetricOpts::new(
+    let cpu = metrics.gauge_float_vec(
+        Opts::new(
             "electrscash_process_cpu_usage",
             "CPU usage by this process [seconds]",
         ),
         &["type"],
     );
-    let fds = metrics.gauge(MetricOpts::new(
+    let fds = metrics.gauge_int(Opts::new(
         "electrscash_process_open_fds",
         "# of file descriptors",
     ));

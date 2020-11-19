@@ -16,7 +16,7 @@ use crate::cashaccount::{txids_by_cashaccount, CashAccountParser};
 use crate::errors::*;
 use crate::index::{TxInRow, TxOutRow, TxRow};
 use crate::mempool::{Tracker, MEMPOOL_HEIGHT};
-use crate::metrics::{HistogramOpts, HistogramVec, Metrics};
+use crate::metrics::Metrics;
 use crate::scripthash::{compute_script_hash, FullHash};
 use crate::store::{ReadStore, Row};
 use crate::timeout::TimeoutTrigger;
@@ -258,7 +258,7 @@ pub struct Query {
     tracker: RwLock<Tracker>,
     tx_cache: TransactionCache,
     txid_limit: usize,
-    duration: HistogramVec,
+    duration: prometheus::HistogramVec,
 }
 
 impl Query {
@@ -274,7 +274,10 @@ impl Query {
             tx_cache,
             txid_limit,
             duration: metrics.histogram_vec(
-                HistogramOpts::new("electrs_query_duration", "Request duration (in seconds)"),
+                prometheus::HistogramOpts::new(
+                    "electrscash_query_duration",
+                    "Request duration (in seconds)",
+                ),
                 &["type"],
             ),
         })

@@ -8,9 +8,7 @@ use std::sync::Mutex;
 use crate::daemon::{Daemon, MempoolEntry};
 use crate::errors::*;
 use crate::index::index_transaction;
-use crate::metrics::{
-    Gauge, GaugeVec, HistogramOpts, HistogramTimer, HistogramVec, MetricOpts, Metrics,
-};
+use crate::metrics::Metrics;
 use crate::store::{ReadStore, Row};
 use crate::util::Bytes;
 
@@ -98,14 +96,14 @@ struct Item {
 }
 
 struct Stats {
-    count: Gauge,
-    update: HistogramVec,
-    vsize: GaugeVec,
+    count: prometheus::IntGauge,
+    update: prometheus::HistogramVec,
+    vsize: prometheus::GaugeVec,
     max_fee_rate: Mutex<f32>,
 }
 
 impl Stats {
-    fn start_timer(&self, step: &str) -> HistogramTimer {
+    fn start_timer(&self, step: &str) -> prometheus::HistogramTimer {
         self.update.with_label_values(&[step]).start_timer()
     }
 
@@ -155,19 +153,19 @@ impl Tracker {
             index: MempoolStore::new(),
             histogram: vec![],
             stats: Stats {
-                count: metrics.gauge(MetricOpts::new(
+                count: metrics.gauge_int(prometheus::Opts::new(
                     "electrscash_mempool_count",
                     "# of mempool transactions",
                 )),
                 update: metrics.histogram_vec(
-                    HistogramOpts::new(
+                    prometheus::HistogramOpts::new(
                         "electrscash_mempool_update",
                         "Time to update mempool (in seconds)",
                     ),
                     &["step"],
                 ),
-                vsize: metrics.gauge_vec(
-                    MetricOpts::new(
+                vsize: metrics.gauge_float_vec(
+                    prometheus::Opts::new(
                         "electrscash_mempool_vsize",
                         "Total vsize of transactions paying at most given fee rate",
                     ),
