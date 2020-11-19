@@ -12,7 +12,7 @@ use std::time::Duration;
 
 use crate::def::PROTOCOL_VERSION_MAX;
 use crate::errors::*;
-use crate::metrics::{HistogramOpts, MetricOpts, Metrics};
+use crate::metrics::Metrics;
 use crate::query::Query;
 use crate::rpc::blockchain::BlockchainRPC;
 use crate::rpc::parseutil::usize_from_value;
@@ -381,10 +381,13 @@ impl RPC {
     ) -> RPC {
         let stats = Arc::new(RPCStats {
             latency: metrics.histogram_vec(
-                HistogramOpts::new("electrscash_electrum_rpc", "Electrum RPC latency (seconds)"),
+                prometheus::HistogramOpts::new(
+                    "electrscash_electrum_rpc",
+                    "Electrum RPC latency (seconds)",
+                ),
                 &["method"],
             ),
-            subscriptions: metrics.gauge(MetricOpts::new(
+            subscriptions: metrics.gauge_int(prometheus::Opts::new(
                 "electrscash_scripthash_subscriptions",
                 "# of scripthash subscriptions for node",
             )),

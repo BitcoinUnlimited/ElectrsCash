@@ -15,7 +15,7 @@ use crate::cashaccount::CashAccountParser;
 use crate::daemon::Daemon;
 use crate::errors::*;
 use crate::index::{index_block, last_indexed_block, read_indexed_blockhashes};
-use crate::metrics::{CounterVec, Histogram, HistogramOpts, HistogramVec, MetricOpts, Metrics};
+use crate::metrics::Metrics;
 use crate::signal::Waiter;
 use crate::store::{DBStore, Row, WriteStore};
 use crate::util::{spawn_thread, HeaderList, SyncChannel};
@@ -26,9 +26,9 @@ struct Parser {
     indexed_blockhashes: Mutex<HashSet<BlockHash>>,
     cashaccount_activation_height: u32,
     // metrics
-    duration: HistogramVec,
-    block_count: CounterVec,
-    bytes_read: Histogram,
+    duration: prometheus::HistogramVec,
+    block_count: prometheus::IntCounterVec,
+    bytes_read: prometheus::Histogram,
 }
 
 impl Parser {
@@ -44,21 +44,21 @@ impl Parser {
             indexed_blockhashes: Mutex::new(indexed_blockhashes),
             cashaccount_activation_height,
             duration: metrics.histogram_vec(
-                HistogramOpts::new(
+                prometheus::HistogramOpts::new(
                     "electrscash_parse_duration",
                     "blk*.dat parsing duration (in seconds)",
                 ),
                 &["step"],
             ),
-            block_count: metrics.counter_vec(
-                MetricOpts::new(
+            block_count: metrics.counter_int_vec(
+                prometheus::Opts::new(
                     "electrscash_parse_blocks",
                     "# of block parsed (from blk*.dat)",
                 ),
                 &["type"],
             ),
 
-            bytes_read: metrics.histogram(HistogramOpts::new(
+            bytes_read: metrics.histogram(prometheus::HistogramOpts::new(
                 "electrscash_parse_bytes_read",
                 "# of bytes read (from blk*.dat)",
             )),

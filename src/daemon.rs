@@ -16,7 +16,7 @@ use std::time::Duration;
 
 use crate::cache::BlockTxIDsCache;
 use crate::errors::*;
-use crate::metrics::{HistogramOpts, HistogramVec, Metrics};
+use crate::metrics::Metrics;
 use crate::signal::Waiter;
 use crate::util::HeaderList;
 
@@ -292,8 +292,8 @@ pub struct Daemon {
     blocktxids_cache: Arc<BlockTxIDsCache>,
 
     // monitoring
-    latency: HistogramVec,
-    size: HistogramVec,
+    latency: prometheus::HistogramVec,
+    size: prometheus::HistogramVec,
 }
 
 impl Daemon {
@@ -321,7 +321,7 @@ impl Daemon {
             blocktxids_cache,
             signal: signal.clone(),
             latency: metrics.histogram_vec(
-                HistogramOpts::new(
+                prometheus::HistogramOpts::new(
                     "electrscash_daemon_rpc",
                     "Bitcoind RPC latency (in seconds)",
                 ),
@@ -329,7 +329,10 @@ impl Daemon {
             ),
             // TODO: use better buckets (e.g. 1 byte to 10MB).
             size: metrics.histogram_vec(
-                HistogramOpts::new("electrscash_daemon_bytes", "Bitcoind RPC size (in bytes)"),
+                prometheus::HistogramOpts::new(
+                    "electrscash_daemon_bytes",
+                    "Bitcoind RPC size (in bytes)",
+                ),
                 &["method", "dir"],
             ),
         };

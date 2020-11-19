@@ -1,6 +1,6 @@
-use crate::metrics::{Gauge, HistogramVec};
+use prometheus::{HistogramVec, IntGauge};
 
 pub struct RPCStats {
     pub latency: HistogramVec,
-    pub subscriptions: Gauge,
+    pub subscriptions: IntGauge,
 }

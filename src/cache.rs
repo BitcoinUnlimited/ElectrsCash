@@ -1,11 +1,10 @@
 use crate::errors::*;
-use crate::metrics::{CounterVec, MetricOpts, Metrics};
+use crate::metrics::Metrics;
 
 use bitcoincash::blockdata::transaction::Transaction;
 use bitcoincash::consensus::encode::deserialize;
 use bitcoincash::hash_types::{BlockHash, Txid};
 use lru::LruCache;
-use prometheus::IntGauge;
 use std::hash::Hash;
 use std::sync::Mutex;
 
@@ -13,12 +12,16 @@ struct SizedLruCache<K, V> {
     map: LruCache<K, (V, usize)>,
     bytes_usage: usize,
     bytes_capacity: usize,
-    lookups: CounterVec,
-    usage: IntGauge,
+    lookups: prometheus::IntCounterVec,
+    usage: prometheus::IntGauge,
 }
 
 impl<K: Hash + Eq, V> SizedLruCache<K, V> {
-    fn new(bytes_capacity: usize, lookups: CounterVec, usage: IntGauge) -> SizedLruCache<K, V> {
+    fn new(
+        bytes_capacity: usize,
+        lookups: prometheus::IntCounterVec,
+        usage: prometheus::IntGauge,
+    ) -> SizedLruCache<K, V> {
         SizedLruCache {
             map: LruCache::unbounded(),
             bytes_usage: 0,
@@ -67,14 +70,14 @@ pub struct BlockTxIDsCache {
 
 impl BlockTxIDsCache {
     pub fn new(bytes_capacity: usize, metrics: &Metrics) -> BlockTxIDsCache {
-        let lookups = metrics.counter_vec(
-            MetricOpts::new(
+        let lookups = metrics.counter_int_vec(
+            prometheus::Opts::new(
                 "electrscash_blocktxids_cache",
                 "# of cache lookups for list of transactions in a block",
             ),
             &["type"],
         );
-        let usage = metrics.gauge_int(MetricOpts::new(
+        let usage = metrics.gauge_int(prometheus::Opts::new(
             "electrscash_blocktxids_cache_size",
             "Cache usage for list of transactions in a block (bytes)",
         ));
@@ -108,15 +111,15 @@ pub struct TransactionCache {
 
 impl TransactionCache {
     pub fn new(bytes_capacity: usize, metrics: &Metrics) -> TransactionCache {
-        let lookups = metrics.counter_vec(
-            MetricOpts::new(
+        let lookups = metrics.counter_int_vec(
+            prometheus::Opts::new(
                 "electrscash_transactions_cache",
                 "# of cache lookups for transactions",
             ),
             &["type"],
         );
-        let usage = metrics.gauge_int(MetricOpts::new(
-            "electrs_transactions_cache_size",
+        let usage = metrics.gauge_int(prometheus::Opts::new(
+            "electrscash_transactions_cache_size",
             "Cache usage for list of transactions (bytes)",
         ));
         TransactionCache {
@@ -160,8 +163,10 @@ mod tests {
 
     #[test]
     fn test_sized_lru_cache_hit_and_miss() {
-        let counter = CounterVec::new(prometheus::Opts::new("name", "help"), &["type"]).unwrap();
-        let usage = IntGauge::new("usage", "help").unwrap();
+        let counter =
+            prometheus::IntCounterVec::new(prometheus::Opts::new("name", "help"), &["type"])
+                .unwrap();
+        let usage = prometheus::IntGauge::new("usage", "help").unwrap();
         let mut cache = SizedLruCache::<i8, i32>::new(100, counter.clone(), usage.clone());
         assert_eq!(counter.with_label_values(&["miss"]).get(), 0);
         assert_eq!(counter.with_label_values(&["hit"]).get(), 0);

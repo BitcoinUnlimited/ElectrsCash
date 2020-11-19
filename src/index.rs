@@ -10,9 +10,7 @@ use std::sync::RwLock;
 use crate::cashaccount::CashAccountParser;
 use crate::daemon::Daemon;
 use crate::errors::*;
-use crate::metrics::{
-    Counter, Gauge, HistogramOpts, HistogramTimer, HistogramVec, MetricOpts, Metrics,
-};
+use crate::metrics::Metrics;
 use crate::scripthash::{compute_script_hash, full_hash, FullHash};
 use crate::signal::Waiter;
 use crate::store::{ReadStore, Row, WriteStore};
@@ -303,34 +301,34 @@ fn read_indexed_headers(store: &dyn ReadStore) -> HeaderList {
 }
 
 struct Stats {
-    blocks: Counter,
-    txns: Counter,
-    vsize: Counter,
-    height: Gauge,
-    duration: HistogramVec,
+    blocks: prometheus::IntCounter,
+    txns: prometheus::IntCounter,
+    vsize: prometheus::IntCounter,
+    height: prometheus::IntGauge,
+    duration: prometheus::HistogramVec,
 }
 
 impl Stats {
     fn new(metrics: &Metrics) -> Stats {
         Stats {
-            blocks: metrics.counter(MetricOpts::new(
+            blocks: metrics.counter_int(prometheus::Opts::new(
                 "electrscash_index_blocks",
                 "# of indexed blocks",
             )),
-            txns: metrics.counter(MetricOpts::new(
+            txns: metrics.counter_int(prometheus::Opts::new(
                 "electrscash_index_txns",
                 "# of indexed transactions",
             )),
-            vsize: metrics.counter(MetricOpts::new(
+            vsize: metrics.counter_int(prometheus::Opts::new(
                 "electrscash_index_vsize",
                 "# of indexed vbytes",
             )),
-            height: metrics.gauge(MetricOpts::new(
+            height: metrics.gauge_int(prometheus::Opts::new(
                 "electrscash_index_height",
                 "Last indexed block's height",
             )),
             duration: metrics.histogram_vec(
-                HistogramOpts::new(
+                prometheus::HistogramOpts::new(
                     "electrscash_index_duration",
                     "indexing duration (in seconds)",
                 ),
@@ -352,7 +350,7 @@ impl Stats {
         self.height.set(height as i64);
     }
 
-    fn start_timer(&self, step: &str) -> HistogramTimer {
+    fn start_timer(&self, step: &str) -> prometheus::HistogramTimer {
         self.duration.with_label_values(&[step]).start_timer()
     }
 }
