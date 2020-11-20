@@ -3,7 +3,7 @@ extern crate electrscash;
 extern crate hex;
 extern crate log;
 
-use electrscash::{config::Config, store::DBStore};
+use electrscash::{config::Config, metrics::Metrics, store::DBStore};
 
 fn max_collision(store: DBStore, prefix: &[u8]) {
     let prefix_len = prefix.len();
@@ -40,7 +40,12 @@ fn run(config: Config) {
     if !config.db_path.exists() {
         panic!("DB {:?} must exist when running this tool!", config.db_path);
     }
-    let store = DBStore::open(&config.db_path, /*low_memory=*/ false);
+
+    let config = Config::from_args();
+    let metrics = Metrics::new(config.monitoring_addr);
+    metrics.start();
+
+    let store = DBStore::open(&config.db_path, /*low_memory=*/ false, &metrics);
     max_collision(store, b"T");
 }
 

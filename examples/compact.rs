@@ -6,7 +6,7 @@ extern crate log;
 
 extern crate error_chain;
 
-use electrscash::{config::Config, errors::*, store::DBStore};
+use electrscash::{config::Config, errors::*, metrics::Metrics, store::DBStore};
 
 use error_chain::ChainedError;
 
@@ -17,7 +17,11 @@ fn run(config: Config) -> Result<()> {
             config.db_path
         );
     }
-    let store = DBStore::open(&config.db_path, /*low_memory=*/ true);
+
+    let metrics = Metrics::new(config.monitoring_addr);
+    metrics.start();
+
+    let store = DBStore::open(&config.db_path, /*low_memory=*/ true, &metrics);
     store.compact();
     Ok(())
 }

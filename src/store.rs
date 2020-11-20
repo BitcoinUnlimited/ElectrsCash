@@ -1,7 +1,13 @@
+use rocksdb::perf::get_memory_usage_stats;
 use std::path::{Path, PathBuf};
 use std::str::from_utf8;
+use std::sync::{Arc, Condvar, Mutex};
+use std::thread;
+use std::time::Duration;
 
 use crate::def::DATABASE_VERSION;
+use crate::metrics::Metrics;
+use crate::util::spawn_thread;
 use crate::util::Bytes;
 
 #[derive(Clone)]
@@ -34,12 +40,14 @@ struct Options {
 }
 
 pub struct DBStore {
-    db: rocksdb::DB,
+    db: Arc<rocksdb::DB>,
     opts: Options,
+    stats_thread: Option<thread::JoinHandle<()>>,
+    stats_thread_kill: Arc<(Mutex<bool>, Condvar)>,
 }
 
 impl DBStore {
-    fn open_opts(opts: Options) -> Self {
+    fn open_opts(opts: Options, metrics: &Metrics) -> Self {
         debug!("opening DB at {:?}", opts.path);
         let mut db_opts = rocksdb::Options::default();
         db_opts.create_if_missing(true);
@@ -59,24 +67,73 @@ impl DBStore {
 
         let mut block_opts = rocksdb::BlockBasedOptions::default();
         block_opts.set_block_size(if opts.low_memory { 256 << 10 } else { 1 << 20 });
-        let store = DBStore {
-            db: rocksdb::DB::open(&db_opts, &opts.path).unwrap(),
+        #[allow(clippy::mutex_atomic)]
+        let mut store = DBStore {
+            db: Arc::new(rocksdb::DB::open(&db_opts, &opts.path).unwrap()),
             opts,
+            stats_thread: None,
+            stats_thread_kill: Arc::new((Mutex::new(false), Condvar::new())),
         };
         if is_new_db {
             store.write(vec![version_marker()], true);
             store.flush();
         }
+        store.start_stats_thread(metrics);
         store
     }
 
+    fn start_stats_thread(&mut self, metrics: &Metrics) {
+        let mem_table_total = metrics.gauge_int(prometheus::Opts::new(
+            format!("electrscash_rockdb_mem_table_total_{:p}", &self.db),
+            "Rockdb approximate memory usage of all the mem-tables".to_string(),
+        ));
+
+        let mem_table_unflushed = metrics.gauge_int(prometheus::Opts::new(
+            format!("electrscash_rockdb_mem_table_unflushed_{:p}", &self.db),
+            "Rocksdb approximate usage of un-flushed mem-tables".to_string(),
+        ));
+
+        let mem_table_readers_total = metrics.gauge_int(prometheus::Opts::new(
+            format!("electrscash_rockdb_mem_table_readers_total_{:p}", &self.db),
+            "Rocksdb approximate memory usage of all the table readers".to_string(),
+        ));
+
+        let dbptr = Arc::clone(&self.db);
+        let kill = Arc::clone(&self.stats_thread_kill);
+
+        self.stats_thread = Some(spawn_thread("dbstats", move || {
+            let (killthread, cvar) = &*kill;
+            loop {
+                let k = killthread.lock().unwrap();
+                let result = cvar.wait_timeout(k, Duration::from_secs(5)).unwrap();
+                if *result.0 {
+                    // kill thread
+                    mem_table_total.set(0);
+                    mem_table_unflushed.set(0);
+                    mem_table_readers_total.set(0);
+                    return;
+                }
+                let mem_usage = get_memory_usage_stats(Some(&[&*dbptr]), None);
+
+                if let Ok(usage) = mem_usage {
+                    mem_table_total.set(usage.mem_table_total as i64);
+                    mem_table_unflushed.set(usage.mem_table_unflushed as i64);
+                    mem_table_readers_total.set(usage.mem_table_readers_total as i64)
+                }
+            }
+        }));
+    }
+
     /// Opens a new RocksDB at the specified location.
-    pub fn open(path: &Path, low_memory: bool) -> Self {
-        DBStore::open_opts(Options {
-            path: path.to_path_buf(),
-            bulk_import: true,
-            low_memory,
-        })
+    pub fn open(path: &Path, low_memory: bool, metrics: &Metrics) -> Self {
+        DBStore::open_opts(
+            Options {
+                path: path.to_path_buf(),
+                bulk_import: true,
+                low_memory,
+            },
+            metrics,
+        )
     }
 
     pub fn enable_compaction(self) -> Self {
@@ -166,7 +223,7 @@ impl WriteStore for DBStore {
     fn write<I: IntoIterator<Item = Row>>(&self, rows: I, sync: bool) {
         let mut batch = rocksdb::WriteBatch::default();
         for row in rows {
-            batch.put(row.key.as_slice(), row.value.as_slice()).unwrap();
+            batch.put(row.key.as_slice(), row.value.as_slice());
         }
         let mut opts = rocksdb::WriteOptions::new();
         opts.set_sync(sync);
@@ -186,6 +243,14 @@ impl WriteStore for DBStore {
 impl Drop for DBStore {
     fn drop(&mut self) {
         trace!("closing DB at {:?}", self.opts.path);
+
+        // Stop exporting memory stats. The thread holds a copy of the db instance, so we need to
+        // wait for it to exit for db to close.
+        let (flag, cvar) = &*self.stats_thread_kill;
+        *flag.lock().unwrap() = true;
+        cvar.notify_one();
+        self.stats_thread.take().map(thread::JoinHandle::join);
+        trace!("done closing db");
     }
 }
 
