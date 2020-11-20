@@ -10,6 +10,10 @@ extern crate serde;
 #[macro_use]
 extern crate configure_me;
 
+extern crate jemallocator;
+#[global_allocator]
+static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
+
 pub mod app;
 pub mod bulk;
 pub mod cache;

@@ -150,18 +150,32 @@ fn start_process_exporter(metrics: &Metrics) {
         "electrscash_process_open_fds",
         "# of file descriptors",
     ));
-    spawn_thread("exporter", move || loop {
-        match parse_stats() {
-            Ok(stats) => {
+
+    let jemalloc_allocated = metrics.gauge_int(Opts::new(
+        "electrscash_process_jemalloc_allocated",
+        "# of bytes allocated by the application.",
+    ));
+
+    let jemalloc_resident = metrics.gauge_int(Opts::new(
+        "electrscash_process_jemalloc_resident",
+        "# of bytes in physically resident data pages mapped by the allocator",
+    ));
+
+    spawn_thread("exporter", move || {
+        let e = jemalloc_ctl::epoch::mib().unwrap();
+        let allocated = jemalloc_ctl::stats::allocated::mib().unwrap();
+        let resident = jemalloc_ctl::stats::resident::mib().unwrap();
+        loop {
+            if let Ok(stats) = parse_stats() {
                 cpu.with_label_values(&["utime"]).set(stats.utime as f64);
                 rss.set(stats.rss as i64);
                 fds.set(stats.fds as i64);
             }
-            Err(e) => {
-                warn!("failed to export process stats: {}", e);
-                return;
-            }
+            e.advance().unwrap();
+            jemalloc_allocated.set(allocated.read().unwrap() as i64);
+            jemalloc_resident.set(resident.read().unwrap() as i64);
+
+            thread::sleep(Duration::from_secs(5));
         }
-        thread::sleep(Duration::from_secs(5));
     });
 }
