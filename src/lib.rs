@@ -23,6 +23,7 @@ pub mod index;
 pub mod mempool;
 pub mod metrics;
 pub mod query;
+pub mod rndcache;
 pub mod rpc;
 pub mod scripthash;
 pub mod signal;

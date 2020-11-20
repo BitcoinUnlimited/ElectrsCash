@@ -28,7 +28,7 @@ fn run_server(config: &Config) -> Result<()> {
     let metrics = Arc::new(Metrics::new(config.monitoring_addr));
     metrics.start();
     let blocktxids_cache = Arc::new(BlockTxIDsCache::new(
-        config.blocktxids_cache_size,
+        config.blocktxids_cache_size as u64,
         &*metrics,
     ));
 
@@ -84,7 +84,7 @@ fn run_server(config: &Config) -> Result<()> {
     .enable_compaction(); // enable auto compactions before starting incremental index updates.
 
     let app = App::new(store, index, daemon, &config)?;
-    let tx_cache = TransactionCache::new(config.tx_cache_size, &*metrics);
+    let tx_cache = TransactionCache::new(config.tx_cache_size as u64, &*metrics);
     let query = Query::new(app.clone(), &*metrics, tx_cache, config.txid_limit);
     let relayfee = query.get_relayfee()?;
     debug!("relayfee: {}", relayfee);
