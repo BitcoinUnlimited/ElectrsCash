@@ -214,7 +214,7 @@ impl Connection {
                     let cmd: Value = from_str(&line).chain_err(|| "invalid JSON format")?;
                     let reply = match (
                         cmd.get("method"),
-                        cmd.get("params").unwrap_or_else(|| &empty_params),
+                        cmd.get("params").unwrap_or(&empty_params),
                         cmd.get("id"),
                     ) {
                         (
