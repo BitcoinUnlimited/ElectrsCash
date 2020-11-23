@@ -1,6 +1,8 @@
 use rocksdb::perf::get_memory_usage_stats;
 use std::path::{Path, PathBuf};
 use std::str::from_utf8;
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering;
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread;
 use std::time::Duration;
@@ -83,18 +85,21 @@ impl DBStore {
     }
 
     fn start_stats_thread(&mut self, metrics: &Metrics) {
+        static DBINSTANCE_COUNT: AtomicUsize = AtomicUsize::new(0);
+        let i = DBINSTANCE_COUNT.fetch_add(1, Ordering::Relaxed);
+
         let mem_table_total = metrics.gauge_int(prometheus::Opts::new(
-            format!("electrscash_rockdb_mem_table_total_{:p}", &self.db),
+            format!("electrscash_rockdb_mem_table_total_{}", i),
             "Rockdb approximate memory usage of all the mem-tables".to_string(),
         ));
 
         let mem_table_unflushed = metrics.gauge_int(prometheus::Opts::new(
-            format!("electrscash_rockdb_mem_table_unflushed_{:p}", &self.db),
+            format!("electrscash_rockdb_mem_table_unflushed_{}", i),
             "Rocksdb approximate usage of un-flushed mem-tables".to_string(),
         ));
 
         let mem_table_readers_total = metrics.gauge_int(prometheus::Opts::new(
-            format!("electrscash_rockdb_mem_table_readers_total_{:p}", &self.db),
+            format!("electrscash_rockdb_mem_table_readers_total_{}", i),
             "Rocksdb approximate memory usage of all the table readers".to_string(),
         ));
 
