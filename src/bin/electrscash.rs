@@ -44,7 +44,7 @@ fn run_server(config: &Config) -> Result<()> {
     )?;
     // Perform initial indexing.
     let compatible = {
-        let store = DBStore::open(&config.db_path, config.low_memory);
+        let store = DBStore::open(&config.db_path, config.low_memory, &*metrics);
         is_compatible_version(&store)
     };
 
@@ -52,7 +52,7 @@ fn run_server(config: &Config) -> Result<()> {
         info!("Incompatible database. Running full reindex.");
         DBStore::destroy(&config.db_path);
     }
-    let store = DBStore::open(&config.db_path, config.low_memory);
+    let store = DBStore::open(&config.db_path, config.low_memory, &*metrics);
     let index = Index::load(
         &store,
         &daemon,
