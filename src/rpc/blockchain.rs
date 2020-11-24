@@ -17,16 +17,25 @@ use bitcoincash::hash_types::Txid;
 use bitcoincash::hashes::hex::ToHex;
 use serde_json::Value;
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
+
+struct Subscription {
+    statushash: Option<FullHash>,
+    alias: Option<String>,
+}
 
 pub struct BlockchainRPC {
     query: Arc<Query>,
     stats: Arc<RPCStats>,
-    subscriptions: HashMap<FullHash, Option<FullHash>>, // ScriptHash -> StatusHash
+    subscriptions: HashMap<FullHash /* scripthash */, Subscription>,
     last_header_entry: Option<HeaderEntry>,
     relayfee: f64,
     doslimits: ConnectionLimits,
+
+    /* Resource tracking */
+    alias_bytes_used: AtomicUsize,
 }
 
 impl BlockchainRPC {
@@ -43,6 +52,7 @@ impl BlockchainRPC {
             last_header_entry: None, // disable header subscription for now
             relayfee,
             doslimits,
+            alias_bytes_used: AtomicUsize::new(0),
         }
     }
     pub fn address_get_balance(&self, params: &[Value], timeout: &TimeoutTrigger) -> Result<Value> {
@@ -70,6 +80,45 @@ impl BlockchainRPC {
         let addr = str_from_value(params.get(0), "address")?;
         let scripthash = addr_to_scripthash(&addr)?;
         listunspent(&*self.query, &scripthash, timeout)
+    }
+
+    pub fn address_subscribe(
+        &mut self,
+        params: &[Value],
+        timeout: &TimeoutTrigger,
+    ) -> Result<Value> {
+        let addr = str_from_value(params.get(0), "address")?;
+        let scripthash = addr_to_scripthash(&addr)?;
+        self.remove_subscription(&scripthash);
+
+        self.doslimits
+            .check_subscriptions(self.get_num_subscriptions() as u32 + 1)?;
+
+        self.doslimits
+            .check_alias_usage(self.alias_bytes_used.load(Ordering::Relaxed) + addr.len())?;
+
+        let statushash = self.query.status(&scripthash, timeout)?.hash();
+        let result = statushash.map_or(Value::Null, |h| json!(hex::encode(h)));
+
+        // We don't hold a lock on alias usage, so we could exceed limit here.
+        // That's OK, it doesn't need to be a hard limit.
+        self.alias_bytes_used
+            .fetch_add(addr.len(), Ordering::Relaxed);
+        self.subscriptions.insert(
+            scripthash,
+            Subscription {
+                statushash,
+                alias: Some(addr),
+            },
+        );
+        self.stats.subscriptions.inc();
+        Ok(result)
+    }
+
+    pub fn address_unsubscribe(&mut self, params: &[Value]) -> Result<Value> {
+        let addr = str_from_value(params.get(0), "address")?;
+        let scripthash = addr_to_scripthash(&addr)?;
+        Ok(json!(self.remove_subscription(&scripthash)))
     }
 
     pub fn block_header(&self, params: &[Value]) -> Result<Value> {
@@ -188,25 +237,27 @@ impl BlockchainRPC {
         timeout: &TimeoutTrigger,
     ) -> Result<Value> {
         let scripthash = scripthash_from_value(params.get(0))?;
-        if !self.subscriptions.contains_key(&scripthash) {
-            self.doslimits
-                .check_subscriptions(self.subscriptions.len() + 1)?;
-        }
+        self.remove_subscription(&scripthash);
+
+        self.doslimits
+            .check_subscriptions(self.get_num_subscriptions() as u32 + 1)?;
+
         let statushash = self.query.status(&scripthash, timeout)?.hash();
         let result = statushash.map_or(Value::Null, |h| json!(hex::encode(h)));
-        if self.subscriptions.insert(scripthash, statushash).is_none() {
-            self.stats.subscriptions.inc();
-        }
+        self.subscriptions.insert(
+            scripthash,
+            Subscription {
+                statushash,
+                alias: None,
+            },
+        );
+        self.stats.subscriptions.inc();
         Ok(result)
     }
 
     pub fn scripthash_unsubscribe(&mut self, params: &[Value]) -> Result<Value> {
         let scripthash = scripthash_from_value(params.get(0))?;
-        let removed = self.subscriptions.remove(&scripthash).is_some();
-        if removed {
-            self.stats.subscriptions.dec();
-        }
-        Ok(json!(removed))
+        Ok(json!(self.remove_subscription(&scripthash)))
     }
 
     pub fn transaction_broadcast(&self, params: &[Value]) -> Result<Value> {
@@ -341,10 +392,20 @@ impl BlockchainRPC {
     }
 
     pub fn on_scripthash_change(&mut self, scripthash: FullHash) -> Result<Option<Value>> {
-        let old_statushash;
+        let old_statushash: Option<FullHash>;
+        let subscription_name: String;
+        let method: &str;
+
         match self.subscriptions.get(&scripthash) {
-            Some(statushash) => {
-                old_statushash = *statushash;
+            Some(subscription) => {
+                old_statushash = subscription.statushash;
+                if let Some(alias) = &subscription.alias {
+                    subscription_name = alias.clone();
+                    method = "blockchain.address.subscribe";
+                } else {
+                    subscription_name = scripthash.to_le_hex();
+                    method = "blockchain.scripthash.subscribe";
+                }
             }
             None => {
                 return Ok(None);
@@ -366,14 +427,29 @@ impl BlockchainRPC {
         let new_statushash_hex = status.hash().map_or(Value::Null, |h| json!(hex::encode(h)));
         let notification = Some(json!({
                     "jsonrpc": "2.0",
-                    "method": "blockchain.scripthash.subscribe",
-                    "params": [scripthash.to_le_hex(), new_statushash_hex]}));
-        self.subscriptions.insert(scripthash, new_statushash);
+                    "method": method,
+                    "params": [subscription_name, new_statushash_hex]}));
+        self.subscriptions.get_mut(&scripthash).unwrap().statushash = new_statushash;
         timer.observe_duration();
         Ok(notification)
     }
 
     pub fn get_num_subscriptions(&self) -> i64 {
         self.subscriptions.len() as i64
+    }
+
+    fn remove_subscription(&mut self, scripthash: &FullHash) -> bool {
+        let removed = self.subscriptions.remove(scripthash);
+        match removed {
+            Some(subscription) => {
+                if let Some(alias) = subscription.alias {
+                    self.alias_bytes_used
+                        .fetch_sub(alias.len(), Ordering::Relaxed);
+                }
+                self.stats.subscriptions.dec();
+                true
+            }
+            None => false,
+        }
     }
 }

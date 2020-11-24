@@ -144,6 +144,7 @@ pub struct Config {
     pub cashaccount_activation_height: u32,
     pub rpc_buffer_size: usize,
     pub scripthash_subscription_limit: u32,
+    pub scripthash_alias_bytes_limit: u32,
 }
 
 /// Returns default daemon directory
@@ -290,6 +291,7 @@ impl Config {
             cashaccount_activation_height: config.cashaccount_activation_height as u32,
             rpc_buffer_size: config.rpc_buffer_size,
             scripthash_subscription_limit: config.scripthash_subscription_limit,
+            scripthash_alias_bytes_limit: config.scripthash_alias_bytes_limit,
         };
         eprintln!("{:?}", config);
         config
@@ -335,6 +337,7 @@ debug_struct! { Config,
     cashaccount_activation_height,
     rpc_buffer_size,
     scripthash_subscription_limit,
+    scripthash_alias_bytes_limit,
 }
 
 struct StaticCookie {

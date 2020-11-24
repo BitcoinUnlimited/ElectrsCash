@@ -152,3 +152,9 @@ name = "scripthash_subscription_limit"
 type = "u32"
 doc = "The maximum number of scripthash subscriptions per connection"
 default = "150000"
+
+[[param]]
+name = "scripthash_alias_bytes_limit"
+type = "u32"
+doc = "The maximum number of bytes stored for scripthash aliases. A bitcoincash address alias is 54 bytes, making the default allow ~1800 blockchain.address subscriptions."
+default = "100000"
