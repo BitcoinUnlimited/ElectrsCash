@@ -22,7 +22,7 @@ use std::time::Duration;
 pub struct BlockchainRPC {
     query: Arc<Query>,
     stats: Arc<RPCStats>,
-    status_hashes: HashMap<FullHash, Value>, // ScriptHash -> StatusHash
+    subscriptions: HashMap<FullHash, Option<FullHash>>, // ScriptHash -> StatusHash
     last_header_entry: Option<HeaderEntry>,
     relayfee: f64,
     rpc_timeout: u16,
@@ -38,7 +38,7 @@ impl BlockchainRPC {
         BlockchainRPC {
             query,
             stats,
-            status_hashes: HashMap::new(),
+            subscriptions: HashMap::new(),
             last_header_entry: None, // disable header subscription for now
             relayfee,
             rpc_timeout,
@@ -186,14 +186,10 @@ impl BlockchainRPC {
         params: &[Value],
         timeout: &TimeoutTrigger,
     ) -> Result<Value> {
-        let script_hash = scripthash_from_value(params.get(0))?;
-        let status = self.query.status(&script_hash, timeout)?;
-        let result = status.hash().map_or(Value::Null, |h| json!(hex::encode(h)));
-        if self
-            .status_hashes
-            .insert(script_hash, result.clone())
-            .is_none()
-        {
+        let scripthash = scripthash_from_value(params.get(0))?;
+        let statushash = self.query.status(&scripthash, timeout)?.hash();
+        let result = statushash.map_or(Value::Null, |h| json!(hex::encode(h)));
+        if self.subscriptions.insert(scripthash, statushash).is_none() {
             self.stats.subscriptions.inc();
         }
         Ok(result)
@@ -201,7 +197,7 @@ impl BlockchainRPC {
 
     pub fn scripthash_unsubscribe(&mut self, params: &[Value]) -> Result<Value> {
         let scripthash = scripthash_from_value(params.get(0))?;
-        let removed = self.status_hashes.remove(&scripthash).is_some();
+        let removed = self.subscriptions.remove(&scripthash).is_some();
         if removed {
             self.stats.subscriptions.dec();
         }
@@ -341,9 +337,9 @@ impl BlockchainRPC {
 
     pub fn on_scripthash_change(&mut self, scripthash: FullHash) -> Result<Option<Value>> {
         let old_statushash;
-        match self.status_hashes.get(&scripthash) {
+        match self.subscriptions.get(&scripthash) {
             Some(statushash) => {
-                old_statushash = statushash;
+                old_statushash = *statushash;
             }
             None => {
                 return Ok(None);
@@ -358,20 +354,21 @@ impl BlockchainRPC {
 
         let timeout = TimeoutTrigger::new(Duration::from_secs(self.rpc_timeout as u64));
         let status = self.query.status(&scripthash, &timeout)?;
-        let new_statushash = status.hash().map_or(Value::Null, |h| json!(hex::encode(h)));
-        if new_statushash == *old_statushash {
+        let new_statushash = status.hash();
+        if new_statushash == old_statushash {
             return Ok(None);
         }
+        let new_statushash_hex = status.hash().map_or(Value::Null, |h| json!(hex::encode(h)));
         let notification = Some(json!({
                     "jsonrpc": "2.0",
                     "method": "blockchain.scripthash.subscribe",
-                    "params": [scripthash.to_le_hex(), new_statushash]}));
-        self.status_hashes.insert(scripthash, new_statushash);
+                    "params": [scripthash.to_le_hex(), new_statushash_hex]}));
+        self.subscriptions.insert(scripthash, new_statushash);
         timer.observe_duration();
         Ok(notification)
     }
 
     pub fn get_num_subscriptions(&self) -> i64 {
-        self.status_hashes.len() as i64
+        self.subscriptions.len() as i64
     }
 }
