@@ -257,22 +257,15 @@ pub struct Query {
     app: Arc<App>,
     tracker: RwLock<Tracker>,
     tx_cache: TransactionCache,
-    txid_limit: usize,
     duration: prometheus::HistogramVec,
 }
 
 impl Query {
-    pub fn new(
-        app: Arc<App>,
-        metrics: &Metrics,
-        tx_cache: TransactionCache,
-        txid_limit: usize,
-    ) -> Arc<Query> {
+    pub fn new(app: Arc<App>, metrics: &Metrics, tx_cache: TransactionCache) -> Arc<Query> {
         Arc::new(Query {
             app,
             tracker: RwLock::new(Tracker::new(metrics)),
             tx_cache,
-            txid_limit,
             duration: metrics.histogram_vec(
                 prometheus::HistogramOpts::new(
                     "electrscash_query_duration",
@@ -433,14 +426,6 @@ impl Query {
             return Err(e);
         }
         let funding = funding.unwrap();
-
-        // if the limit is enabled
-        if self.txid_limit > 0 && funding.len() > self.txid_limit {
-            bail!(
-                "{}+ transactions found, query may take a long time",
-                funding.len()
-            );
-        }
 
         for funding_output in &funding {
             timeout.check()?;

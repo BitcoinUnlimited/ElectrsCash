@@ -1,6 +1,6 @@
 [package]
 name = "electrscash"
-version = "2.1.0"
+version = "3.0.0"
 authors = ["Bitcoin Unlimited developers <info@bitcoinunlimited.info", "Roman Zeyde <me@romanzey.de>"]
 description = "An efficient implementation of Electrum Server"
 license = "MIT"
