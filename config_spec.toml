@@ -146,3 +146,9 @@ name = "rpc_buffer_size"
 type = "usize"
 doc = "Size of the message queue for each peer. If set too small, subscription notifications may drop"
 default = "2000"
+
+[[param]]
+name = "scripthash_subscription_limit"
+type = "u32"
+doc = "The maximum number of scripthash subscriptions per connection"
+default = "150000"
