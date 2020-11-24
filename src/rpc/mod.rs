@@ -11,6 +11,7 @@ use std::thread;
 use std::time::Duration;
 
 use crate::def::PROTOCOL_VERSION_MAX;
+use crate::doslimit::ConnectionLimits;
 use crate::errors::*;
 use crate::metrics::Metrics;
 use crate::query::Query;
@@ -48,7 +49,7 @@ struct Connection {
     addr: SocketAddr,
     sender: SyncSender<Message>,
     stats: Arc<RPCStats>,
-    rpc_timeout: u16,
+    doslimits: ConnectionLimits,
     blockchainrpc: BlockchainRPC,
 }
 
@@ -59,7 +60,7 @@ impl Connection {
         addr: SocketAddr,
         stats: Arc<RPCStats>,
         relayfee: f64,
-        rpc_timeout: u16,
+        doslimits: ConnectionLimits,
         sender: SyncSender<Message>,
     ) -> Connection {
         Connection {
@@ -68,8 +69,8 @@ impl Connection {
             addr,
             sender,
             stats: stats.clone(),
-            rpc_timeout,
-            blockchainrpc: BlockchainRPC::new(query, stats, relayfee, rpc_timeout),
+            doslimits,
+            blockchainrpc: BlockchainRPC::new(query, stats, relayfee, doslimits),
         }
     }
 
@@ -91,7 +92,7 @@ impl Connection {
             .latency
             .with_label_values(&[method])
             .start_timer();
-        let timeout = TimeoutTrigger::new(Duration::from_secs(self.rpc_timeout as u64));
+        let timeout = TimeoutTrigger::new(Duration::from_secs(self.doslimits.rpc_timeout as u64));
         let result = match method {
             "blockchain.address.get_balance" => {
                 self.blockchainrpc.address_get_balance(&params, &timeout)
@@ -376,7 +377,7 @@ impl RPC {
         query: Arc<Query>,
         metrics: Arc<Metrics>,
         relayfee: f64,
-        rpc_timeout: u16,
+        doslimits: ConnectionLimits,
         rpc_buffer_size: usize,
     ) -> RPC {
         let stats = Arc::new(RPCStats {
@@ -419,13 +420,7 @@ impl RPC {
                     let spawned = spawn_thread("peer", move || {
                         info!("[{}] connected peer", addr);
                         let conn = Connection::new(
-                            query,
-                            stream,
-                            addr,
-                            stats,
-                            relayfee,
-                            rpc_timeout,
-                            sender,
+                            query, stream, addr, stats, relayfee, doslimits, sender,
                         );
                         conn.run(receiver);
                         info!("[{}] disconnected peer", addr);

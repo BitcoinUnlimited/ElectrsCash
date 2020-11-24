@@ -1,3 +1,4 @@
+use crate::doslimit::ConnectionLimits;
 use crate::errors::*;
 use crate::query::Query;
 use crate::rpc::parseutil::{
@@ -25,7 +26,7 @@ pub struct BlockchainRPC {
     subscriptions: HashMap<FullHash, Option<FullHash>>, // ScriptHash -> StatusHash
     last_header_entry: Option<HeaderEntry>,
     relayfee: f64,
-    rpc_timeout: u16,
+    doslimits: ConnectionLimits,
 }
 
 impl BlockchainRPC {
@@ -33,7 +34,7 @@ impl BlockchainRPC {
         query: Arc<Query>,
         stats: Arc<RPCStats>,
         relayfee: f64,
-        rpc_timeout: u16,
+        doslimits: ConnectionLimits,
     ) -> BlockchainRPC {
         BlockchainRPC {
             query,
@@ -41,7 +42,7 @@ impl BlockchainRPC {
             subscriptions: HashMap::new(),
             last_header_entry: None, // disable header subscription for now
             relayfee,
-            rpc_timeout,
+            doslimits,
         }
     }
     pub fn address_get_balance(&self, params: &[Value], timeout: &TimeoutTrigger) -> Result<Value> {
@@ -187,6 +188,10 @@ impl BlockchainRPC {
         timeout: &TimeoutTrigger,
     ) -> Result<Value> {
         let scripthash = scripthash_from_value(params.get(0))?;
+        if !self.subscriptions.contains_key(&scripthash) {
+            self.doslimits
+                .check_subscriptions(self.subscriptions.len() + 1)?;
+        }
         let statushash = self.query.status(&scripthash, timeout)?.hash();
         let result = statushash.map_or(Value::Null, |h| json!(hex::encode(h)));
         if self.subscriptions.insert(scripthash, statushash).is_none() {
@@ -352,7 +357,7 @@ impl BlockchainRPC {
             .with_label_values(&["statushash_update"])
             .start_timer();
 
-        let timeout = TimeoutTrigger::new(Duration::from_secs(self.rpc_timeout as u64));
+        let timeout = TimeoutTrigger::new(Duration::from_secs(self.doslimits.rpc_timeout as u64));
         let status = self.query.status(&scripthash, &timeout)?;
         let new_statushash = status.hash();
         if new_statushash == old_statushash {

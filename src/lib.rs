@@ -21,6 +21,7 @@ pub mod cashaccount;
 pub mod config;
 pub mod daemon;
 pub mod def;
+pub mod doslimit;
 pub mod errors;
 pub mod fake;
 pub mod index;

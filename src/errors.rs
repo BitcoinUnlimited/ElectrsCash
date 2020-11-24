@@ -32,3 +32,7 @@ error_chain! {
         }
     }
 }
+
+pub fn rpc_invalid_request(what: String) -> ErrorKind {
+    ErrorKind::RpcError(RpcErrorCode::InvalidRequest, what)
+}

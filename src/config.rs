@@ -143,6 +143,7 @@ pub struct Config {
     pub low_memory: bool,
     pub cashaccount_activation_height: u32,
     pub rpc_buffer_size: usize,
+    pub scripthash_subscription_limit: u32,
 }
 
 /// Returns default daemon directory
@@ -288,6 +289,7 @@ impl Config {
             low_memory: config.low_memory,
             cashaccount_activation_height: config.cashaccount_activation_height as u32,
             rpc_buffer_size: config.rpc_buffer_size,
+            scripthash_subscription_limit: config.scripthash_subscription_limit,
         };
         eprintln!("{:?}", config);
         config
@@ -332,6 +334,7 @@ debug_struct! { Config,
     low_memory,
     cashaccount_activation_height,
     rpc_buffer_size,
+    scripthash_subscription_limit,
 }
 
 struct StaticCookie {
