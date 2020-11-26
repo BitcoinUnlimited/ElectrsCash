@@ -30,6 +30,11 @@ error_chain! {
             description("RPC error")
             display("RPC error ({} {:?}): {}", *code as i32, code, msg)
         }
+
+        WebSocket(msg: String) {
+            description("WebSocket error")
+            display("WebSocket {}", msg)
+        }
     }
 }
 

@@ -1,5 +1,3 @@
-use bytecodec;
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Opcode {
     ContinuationFrame = 0x0,
@@ -18,14 +16,11 @@ impl Opcode {
             0x8 => Opcode::ConnectionClose,
             0x9 => Opcode::Ping,
             0xA => Opcode::Pong,
-            _ => track_panic!(bytecodec::ErrorKind::InvalidInput, "Unknown opcode: {}", n),
+            _ => return Err(bytecodec::ErrorKind::InvalidInput.into()),
         })
     }
 
     pub fn is_control(&self) -> bool {
-        match *self {
-            Opcode::ConnectionClose | Opcode::Ping | Opcode::Pong => true,
-            _ => false,
-        }
+        matches!(*self, Opcode::ConnectionClose | Opcode::Ping | Opcode::Pong)
     }
 }
