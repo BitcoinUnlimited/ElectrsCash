@@ -59,6 +59,7 @@ pub struct FrameEncoder {
     payload: Vec<u8>,
     payload_offset: usize,
     payload_length: usize,
+    first_frame: bool,
 }
 impl FrameEncoder {
     pub fn start_encoding_data<R: Read>(&mut self, mut reader: R) -> Result<StreamState> {
@@ -76,7 +77,41 @@ impl FrameEncoder {
             }
             Ok(0) => return Ok(StreamState::Eos),
             Ok(size) => {
-                self.start_encoding_header(Opcode::BinaryFrame, size)?;
+                let mut resize = size;
+                let mut end_of_message = false;
+                // The RPC interface that we're proxying uses '\n' as message
+                // separator.
+                //
+                // We need to translate this to frames. So '\n' means it's
+                // the final frame of the message. Set FINBIT.
+                //
+                // The message after '\n' is the first frame of a new message,
+                // so it shall use opcode TextFrame. If parent message did not
+                // have '\n', that menas we're continuing parent message and
+                // must use opcode ContinuationFrame.
+                loop {
+                    let last_char_offset = self.payload_offset + resize - 1;
+                    if let Some(c) = self.payload.get(last_char_offset) {
+                        if *c == b'\n' {
+                            end_of_message = true;
+                            self.payload[last_char_offset] = 0;
+                            resize -= 1;
+                            continue;
+                        }
+                    }
+                    break;
+                }
+                if resize == 0 {
+                    return Ok(StreamState::Normal);
+                }
+                if self.first_frame {
+                    // Next message will also be first frame.
+                    self.first_frame = end_of_message;
+                    self.start_encoding_header(Opcode::TextFrame, resize, end_of_message)?;
+                } else {
+                    self.first_frame = end_of_message;
+                    self.start_encoding_header(Opcode::ContinuationFrame, resize, end_of_message)?;
+                }
             }
         }
         Ok(StreamState::Normal)
@@ -86,10 +121,15 @@ impl FrameEncoder {
         &mut self,
         opcode: Opcode,
         payload_len: usize,
+        end_of_message: bool,
     ) -> bytecodec::Result<()> {
         let header_size;
         let mut header = [0; 2 + 8];
-        header[0] = FIN_FLAG | (opcode as u8);
+        header[0] = if end_of_message {
+            FIN_FLAG | (opcode as u8)
+        } else {
+            opcode as u8
+        };
         if payload_len < 126 {
             header[1] = payload_len as u8;
             header_size = 2;
@@ -141,7 +181,7 @@ impl Encode for FrameEncoder {
         }
         match item {
             Frame::ConnectionClose { code, reason } => {
-                self.start_encoding_header(Opcode::ConnectionClose, 2 + reason.len())?;
+                self.start_encoding_header(Opcode::ConnectionClose, 2 + reason.len(), true)?;
                 self.payload_length = 2 + reason.len();
                 if self.payload_length > self.payload.len() {
                     return Err(bytecodec::ErrorKind::InvalidInput.into());
@@ -150,7 +190,7 @@ impl Encode for FrameEncoder {
                 (&mut self.payload[2..][..reason.len()]).copy_from_slice(&reason);
             }
             Frame::Pong { data } => {
-                self.start_encoding_header(Opcode::Pong, data.len())?;
+                self.start_encoding_header(Opcode::Pong, data.len(), true)?;
                 self.payload_length = data.len();
                 if self.payload_length > self.payload.len() {
                     error_encoder_input()?;
@@ -178,6 +218,7 @@ impl Default for FrameEncoder {
             payload: vec![0; 4096],
             payload_length: 0,
             payload_offset: 0,
+            first_frame: true,
         }
     }
 }
