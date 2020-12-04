@@ -88,8 +88,11 @@ fn run_server(config: &Config) -> Result<()> {
     let tx_cache = TransactionCache::new(config.tx_cache_size as u64, &*metrics);
     let query = Query::new(app.clone(), &*metrics, tx_cache);
     let relayfee = query.get_relayfee()?;
-    let doslimits =
-        ConnectionLimits::new(config.rpc_timeout, config.scripthash_subscription_limit, 0);
+    let doslimits = ConnectionLimits::new(
+        config.rpc_timeout,
+        config.scripthash_subscription_limit,
+        config.scripthash_alias_bytes_limit,
+    );
 
     let mut server: Option<RPC> = None; // Electrum RPC server
 

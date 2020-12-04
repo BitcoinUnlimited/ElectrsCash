@@ -104,9 +104,13 @@ impl Connection {
             "blockchain.address.get_scripthash" => {
                 self.blockchainrpc.address_get_scripthash(&params)
             }
+            "blockchain.address.subscribe" => {
+                self.blockchainrpc.address_subscribe(&params, &timeout)
+            }
             "blockchain.address.listunspent" => {
                 self.blockchainrpc.address_listunspent(&params, &timeout)
             }
+            "blockchain.address.unsubscribe" => self.blockchainrpc.address_unsubscribe(&params),
             "blockchain.block.header" => self.blockchainrpc.block_header(&params),
             "blockchain.block.headers" => self.blockchainrpc.block_headers(&params),
             "blockchain.estimatefee" => self.blockchainrpc.estimatefee(&params),

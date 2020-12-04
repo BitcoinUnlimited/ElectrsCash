@@ -24,14 +24,27 @@ impl ConnectionLimits {
         }
     }
 
-    pub fn check_subscriptions(&self, num_subscriptions: usize) -> Result<()> {
-        if num_subscriptions <= self.max_subscriptions as usize {
+    pub fn check_subscriptions(&self, num_subscriptions: u32) -> Result<()> {
+        if num_subscriptions <= self.max_subscriptions as u32 {
             return Ok(());
         }
 
         Err(rpc_invalid_request(format!(
             "Scripthash subscriptions limit reached (max {})",
             self.max_subscriptions
+        ))
+        .into())
+    }
+
+    pub fn check_alias_usage(&self, bytes_used: usize) -> Result<()> {
+        if bytes_used <= self.max_alias_bytes as usize {
+            return Ok(());
+        }
+
+        Err(rpc_invalid_request(format!(
+            "Address/alias subscriptions limit reached (max {} bytes) \
+            Use scripthash subscriptions for more subscriptions or increase this limit.",
+            self.max_alias_bytes
         ))
         .into())
     }
