@@ -130,6 +130,7 @@ pub struct Config {
     pub blocks_dir: PathBuf,
     pub daemon_rpc_addr: SocketAddr,
     pub electrum_rpc_addr: SocketAddr,
+    pub electrum_ws_addr: SocketAddr,
     pub monitoring_addr: SocketAddr,
     pub jsonrpc_import: bool,
     pub wait_duration: Duration,
@@ -220,12 +221,22 @@ impl Config {
             Network::Regtest => 24224,
         };
 
+        let default_ws_port = match config.network {
+            Network::Bitcoin => 50003,
+            Network::Testnet => 60003,
+            Network::Regtest => 60403,
+        };
+
         let daemon_rpc_addr: SocketAddr = config.daemon_rpc_addr.map_or(
             (DEFAULT_SERVER_ADDRESS, default_daemon_port).into(),
             ResolvAddr::resolve_or_exit,
         );
         let electrum_rpc_addr: SocketAddr = config.electrum_rpc_addr.map_or(
             (DEFAULT_SERVER_ADDRESS, default_electrum_port).into(),
+            ResolvAddr::resolve_or_exit,
+        );
+        let electrum_ws_addr: SocketAddr = config.electrum_ws_addr.map_or(
+            (DEFAULT_SERVER_ADDRESS, default_ws_port).into(),
             ResolvAddr::resolve_or_exit,
         );
         let monitoring_addr: SocketAddr = config.monitoring_addr.map_or(
@@ -277,6 +288,7 @@ impl Config {
             blocks_dir,
             daemon_rpc_addr,
             electrum_rpc_addr,
+            electrum_ws_addr,
             monitoring_addr,
             jsonrpc_import: config.jsonrpc_import,
             wait_duration: Duration::from_secs(config.wait_duration_secs),
@@ -325,6 +337,7 @@ debug_struct! { Config,
     blocks_dir,
     daemon_rpc_addr,
     electrum_rpc_addr,
+    electrum_ws_addr,
     monitoring_addr,
     jsonrpc_import,
     index_batch_size,

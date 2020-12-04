@@ -96,6 +96,12 @@ fn run_server(config: &Config) -> Result<()> {
 
     let mut server: Option<RPC> = None; // Electrum RPC server
 
+    let rpc_addr = config.electrum_rpc_addr;
+    let ws_addr = config.electrum_ws_addr;
+    electrscash::util::spawn_thread("ws", move || {
+        electrscash::wstcp::start_ws_proxy(ws_addr, rpc_addr)
+    });
+
     loop {
         let (headers_changed, new_tip) = app.update(&signal)?;
         let txs_changed = query.update_mempool()?;
