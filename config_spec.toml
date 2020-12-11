@@ -68,6 +68,11 @@ type = "crate::config::ResolvAddr"
 doc = "Electrum server JSONRPC 'addr:port' to listen on (default: '127.0.0.1:50001' for mainnet, '127.0.0.1:60001' for testnet and '127.0.0.1:60401' for regtest)"
 
 [[param]]
+name = "electrum_ws_addr"
+type = "crate::config::ResolvAddr"
+doc = "Electrum websocket server 'addr:port' to listen on (default: '127.0.0.1:50003' for mainnet, '127.0.0.1:60003' for testnet and '127.0.0.1:60403' for regtest)"
+
+[[param]]
 name = "daemon_rpc_addr"
 type = "crate::config::ResolvAddr"
 doc = "Bitcoin daemon JSONRPC 'addr:port' to connect (default: 127.0.0.1:8332 for mainnet, 127.0.0.1:18332 for testnet and 127.0.0.1:18443 for regtest)"
