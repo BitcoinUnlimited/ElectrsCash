@@ -146,6 +146,7 @@ pub struct Config {
     pub rpc_buffer_size: usize,
     pub scripthash_subscription_limit: u32,
     pub scripthash_alias_bytes_limit: u32,
+    pub rpc_max_connections: u32,
 }
 
 /// Returns default daemon directory
@@ -304,6 +305,7 @@ impl Config {
             rpc_buffer_size: config.rpc_buffer_size,
             scripthash_subscription_limit: config.scripthash_subscription_limit,
             scripthash_alias_bytes_limit: config.scripthash_alias_bytes_limit,
+            rpc_max_connections: config.rpc_max_connections,
         };
         eprintln!("{:?}", config);
         config
@@ -351,6 +353,7 @@ debug_struct! { Config,
     rpc_buffer_size,
     scripthash_subscription_limit,
     scripthash_alias_bytes_limit,
+    rpc_max_connections,
 }
 
 struct StaticCookie {
