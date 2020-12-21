@@ -11,7 +11,7 @@ use std::thread;
 use std::time::Duration;
 
 use crate::def::PROTOCOL_VERSION_MAX;
-use crate::doslimit::ConnectionLimits;
+use crate::doslimit::{ConnectionLimits, GlobalLimits};
 use crate::errors::*;
 use crate::metrics::Metrics;
 use crate::query::Query;
@@ -381,15 +381,13 @@ impl RPC {
         query: Arc<Query>,
         metrics: Arc<Metrics>,
         relayfee: f64,
-        doslimits: ConnectionLimits,
+        connection_limits: ConnectionLimits,
+        global_limits: Arc<GlobalLimits>,
         rpc_buffer_size: usize,
     ) -> RPC {
         let stats = Arc::new(RPCStats {
             latency: metrics.histogram_vec(
-                prometheus::HistogramOpts::new(
-                    "electrscash_electrum_rpc",
-                    "Electrum RPC latency (seconds)",
-                ),
+                prometheus::HistogramOpts::new("electrscash_rpc_latency", "RPC latency (seconds)"),
                 &["method"],
             ),
             subscriptions: metrics.gauge_int(prometheus::Opts::new(
@@ -413,6 +411,19 @@ impl RPC {
                 let (garbage_sender, garbage_receiver) = crossbeam_channel::unbounded();
 
                 while let Some((stream, addr)) = acceptor.receiver().recv().unwrap() {
+                    let global_limits = global_limits.clone();
+
+                    let mut total_connections: (u32, u32);
+                    match global_limits.inc_connection() {
+                        Err(e) => {
+                            trace!("[{}] dropping peer - {}", addr, e);
+                            let _ = stream.shutdown(Shutdown::Both);
+                            continue;
+                        }
+                        Ok(n) => {
+                            total_connections = (n, global_limits.max_connections());
+                        }
+                    }
                     // explicitely scope the shadowed variables for the new thread
                     let query = Arc::clone(&query);
                     let stats = Arc::clone(&stats);
@@ -422,12 +433,30 @@ impl RPC {
                     senders.lock().unwrap().push(sender.clone());
 
                     let spawned = spawn_thread("peer", move || {
-                        info!("[{}] connected peer", addr);
+                        info!(
+                            "[{}] connected peer ({} out of {} connection slots used)",
+                            addr, total_connections.0, total_connections.1
+                        );
                         let conn = Connection::new(
-                            query, stream, addr, stats, relayfee, doslimits, sender,
+                            query,
+                            stream,
+                            addr,
+                            stats,
+                            relayfee,
+                            connection_limits,
+                            sender,
                         );
                         conn.run(receiver);
-                        info!("[{}] disconnected peer", addr);
+                        match global_limits.dec_connection() {
+                            Ok(n) => {
+                                total_connections = (n, global_limits.max_connections());
+                            }
+                            Err(e) => error!("{}", e),
+                        };
+                        info!(
+                            "[{}] disconnected peer ({} out of {} connection slots used)",
+                            addr, total_connections.0, total_connections.1
+                        );
                         let _ = garbage_sender.send(std::thread::current().id());
                     });
 

@@ -14,7 +14,7 @@ use electrscash::{
     cache::{BlockTxIDsCache, TransactionCache},
     config::Config,
     daemon::Daemon,
-    doslimit::ConnectionLimits,
+    doslimit::{ConnectionLimits, GlobalLimits},
     errors::*,
     index::Index,
     metrics::Metrics,
@@ -88,11 +88,12 @@ fn run_server(config: &Config) -> Result<()> {
     let tx_cache = TransactionCache::new(config.tx_cache_size as u64, &*metrics);
     let query = Query::new(app.clone(), &*metrics, tx_cache);
     let relayfee = query.get_relayfee()?;
-    let doslimits = ConnectionLimits::new(
+    let connection_limits = ConnectionLimits::new(
         config.rpc_timeout,
         config.scripthash_subscription_limit,
         config.scripthash_alias_bytes_limit,
     );
+    let global_limits = Arc::new(GlobalLimits::new(config.rpc_max_connections, &*metrics));
 
     let mut server: Option<RPC> = None; // Electrum RPC server
 
@@ -119,7 +120,8 @@ fn run_server(config: &Config) -> Result<()> {
                 query.clone(),
                 metrics.clone(),
                 relayfee,
-                doslimits,
+                connection_limits,
+                global_limits.clone(),
                 config.rpc_buffer_size,
             )),
         };

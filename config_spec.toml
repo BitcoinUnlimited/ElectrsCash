@@ -163,3 +163,9 @@ name = "scripthash_alias_bytes_limit"
 type = "u32"
 doc = "The maximum number of bytes stored for scripthash aliases. A bitcoincash address alias is 54 bytes, making the default allow ~1800 blockchain.address subscriptions."
 default = "100000"
+
+[[param]]
+name = "rpc_max_connections"
+type = "u32"
+doc = "Maximum number of simultaneous RPC connections."
+default = "500"
