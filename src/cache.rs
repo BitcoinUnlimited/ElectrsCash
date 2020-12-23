@@ -94,24 +94,6 @@ impl TransactionCache {
         }
     }
 
-    pub fn get_or_else<F>(&self, txid: &Txid, load_txn_func: F) -> Result<Transaction>
-    where
-        F: FnOnce() -> Result<Vec<u8>>,
-    {
-        if let Some(txn) = self.get(txid) {
-            return Ok(txn);
-        }
-        let mut serialized_txn = load_txn_func()?;
-        let txn = deserialize(&serialized_txn).chain_err(|| "failed to parse serialized tx")?;
-        serialized_txn.shrink_to_fit();
-        let size = serialized_txn.capacity();
-        self.map
-            .lock()
-            .unwrap()
-            .put(*txid, serialized_txn, size as u64);
-        Ok(txn)
-    }
-
     pub fn get(&self, txid: &Txid) -> Option<Transaction> {
         if let Some(serialized_txn) = self.map.lock().unwrap().get(txid) {
             if let Ok(tx) = deserialize(&serialized_txn) {
@@ -121,5 +103,14 @@ impl TransactionCache {
             }
         }
         None
+    }
+
+    pub fn put(&self, txid: &Txid, mut serialized_tx: Vec<u8>) {
+        serialized_tx.shrink_to_fit();
+        let size = serialized_tx.capacity();
+        self.map
+            .lock()
+            .unwrap()
+            .put(*txid, serialized_tx, size as u64);
     }
 }

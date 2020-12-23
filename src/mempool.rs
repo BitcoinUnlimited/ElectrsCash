@@ -17,6 +17,12 @@ const VSIZE_BIN_WIDTH: u32 = 100_000; // in vbytes
 /// Fake height value used to signify that a transaction is in the memory pool.
 pub const MEMPOOL_HEIGHT: u32 = 0x7FFF_FFFF;
 
+pub enum ConfirmationState {
+    Confirmed,
+    InMempool,
+    UnconfirmedParent,
+}
+
 struct MempoolStore {
     map: BTreeMap<Bytes, Vec<Bytes>>,
 }
@@ -260,6 +266,25 @@ impl Tracker {
 
         self.stats.count.set(self.items.len() as i64);
         Ok(changed_txs)
+    }
+
+    pub fn tx_confirmation_state(&self, txid: &Txid, height: u32) -> ConfirmationState {
+        if height != MEMPOOL_HEIGHT {
+            return ConfirmationState::Confirmed;
+        }
+
+        // Check if any of our inputs are unconfirmed
+        if let Some(tx) = self.get_txn(txid) {
+            for input in tx.input.iter() {
+                let prevout = &input.previous_output.txid;
+                if self.contains(prevout) {
+                    return ConfirmationState::UnconfirmedParent;
+                }
+            }
+        } else {
+            trace!("tx {} had mempool high, but was not in our mempool", txid);
+        }
+        ConfirmationState::InMempool
     }
 
     fn add(&mut self, txid: &Txid, tx: Transaction, entry: MempoolEntry) {

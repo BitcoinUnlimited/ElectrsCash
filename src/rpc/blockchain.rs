@@ -279,10 +279,10 @@ impl BlockchainRPC {
             None => false,
         };
         if !verbose {
-            let tx = self.query.load_txn(&tx_hash, None, None)?;
+            let tx = self.query.tx().get(&tx_hash, None, None)?;
             Ok(json!(hex::encode(serialize(&tx))))
         } else {
-            let header = self.query.lookup_blockheader(&tx_hash, None)?;
+            let header = self.query.header().get_by_txid(&tx_hash, None)?;
             let blocktime = match header {
                 Some(ref header) => header.header().time,
                 None => 0,
@@ -293,7 +293,7 @@ impl BlockchainRPC {
             };
             let confirmations = match header {
                 Some(ref header) => {
-                    if let Some(best) = self.query.best_header() {
+                    if let Some(best) = self.query.header().best() {
                         best.height() - header.height()
                     } else {
                         0
@@ -302,7 +302,7 @@ impl BlockchainRPC {
                 None => 0,
             };
             let blockhash = header.map(|h| *h.hash());
-            let tx = self.query.load_txn(&tx_hash, blockhash.as_ref(), None)?;
+            let tx = self.query.tx().get(&tx_hash, blockhash.as_ref(), None)?;
 
             let tx_serialized = serialize(&tx);
             Ok(json!({

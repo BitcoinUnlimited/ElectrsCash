@@ -33,7 +33,7 @@ fn run_server(config: &Config) -> Result<()> {
         &*metrics,
     ));
 
-    let daemon = Daemon::new(
+    let daemon = Arc::new(Daemon::new(
         &config.daemon_dir,
         &config.blocks_dir,
         config.daemon_rpc_addr,
@@ -42,7 +42,7 @@ fn run_server(config: &Config) -> Result<()> {
         signal.clone(),
         blocktxids_cache,
         &*metrics,
-    )?;
+    )?);
     // Perform initial indexing.
     let compatible = {
         let store = DBStore::open(&config.db_path, config.low_memory, &*metrics);
@@ -86,7 +86,7 @@ fn run_server(config: &Config) -> Result<()> {
 
     let app = App::new(store, index, daemon, &config)?;
     let tx_cache = TransactionCache::new(config.tx_cache_size as u64, &*metrics);
-    let query = Query::new(app.clone(), &*metrics, tx_cache);
+    let query = Query::new(app.clone(), &*metrics, tx_cache)?;
     let relayfee = query.get_relayfee()?;
     let connection_limits = ConnectionLimits::new(
         config.rpc_timeout,
