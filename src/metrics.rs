@@ -1,6 +1,6 @@
 use std::fs;
 use std::io;
-use std::net::SocketAddr;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::thread;
 use std::time::Duration;
 
@@ -22,6 +22,14 @@ impl Metrics {
         Metrics {
             reg: prometheus::Registry::new(),
             addr,
+        }
+    }
+
+    /// Constructor for use in unittests
+    pub fn dummy() -> Metrics {
+        Metrics {
+            reg: prometheus::Registry::new(),
+            addr: SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 1234),
         }
     }
 

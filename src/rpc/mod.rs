@@ -413,17 +413,15 @@ impl RPC {
                 while let Some((stream, addr)) = acceptor.receiver().recv().unwrap() {
                     let global_limits = global_limits.clone();
 
-                    let mut total_connections: (u32, u32);
-                    match global_limits.inc_connection() {
+                    let mut connections;
+                    match global_limits.inc_connection(&addr.ip()) {
                         Err(e) => {
                             trace!("[{}] dropping peer - {}", addr, e);
                             let _ = stream.shutdown(Shutdown::Both);
                             continue;
                         }
-                        Ok(n) => {
-                            total_connections = (n, global_limits.max_connections());
-                        }
-                    }
+                        Ok(n) => connections = n,
+                    };
                     // explicitely scope the shadowed variables for the new thread
                     let query = Arc::clone(&query);
                     let stats = Arc::clone(&stats);
@@ -434,8 +432,10 @@ impl RPC {
 
                     let spawned = spawn_thread("peer", move || {
                         info!(
-                            "[{}] connected peer ({} out of {} connection slots used)",
-                            addr, total_connections.0, total_connections.1
+                            "[{}] connected peer ({:?} out of {:?} connection slots used)",
+                            addr,
+                            connections,
+                            global_limits.connection_limits(),
                         );
                         let conn = Connection::new(
                             query,
@@ -447,15 +447,15 @@ impl RPC {
                             sender,
                         );
                         conn.run(receiver);
-                        match global_limits.dec_connection() {
-                            Ok(n) => {
-                                total_connections = (n, global_limits.max_connections());
-                            }
+                        match global_limits.dec_connection(&addr.ip()) {
+                            Ok(n) => connections = n,
                             Err(e) => error!("{}", e),
                         };
                         info!(
-                            "[{}] disconnected peer ({} out of {} connection slots used)",
-                            addr, total_connections.0, total_connections.1
+                            "[{}] disconnected peer ({:?} out of {:?} connection slots used)",
+                            addr,
+                            connections,
+                            global_limits.connection_limits(),
                         );
                         let _ = garbage_sender.send(std::thread::current().id());
                     });

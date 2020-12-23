@@ -169,3 +169,9 @@ name = "rpc_max_connections"
 type = "u32"
 doc = "Maximum number of simultaneous RPC connections."
 default = "500"
+
+[[param]]
+name = "rpc_max_connections_shared_prefix"
+type = "u32"
+doc = "Maximum number of simultaneous RPC connections from IP's sharing first two octets (255.255.0.0 for IPv4)."
+default = "100"

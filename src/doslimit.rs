@@ -3,24 +3,50 @@ use crate::metrics::Metrics;
 
 use prometheus::IntGauge;
 
+use std::convert::TryInto;
+use std::net::IpAddr;
 use std::sync::atomic::AtomicI32;
 use std::sync::atomic::Ordering;
+use std::sync::Mutex;
+
+use std::collections::hash_map::Entry;
+use std::collections::HashMap;
 
 pub struct GlobalLimits {
     /// Maximum number of connections we accept in total.
-    pub max_connections_total: i32,
+    max_connections_total: i32,
+
+    /// Max connections from IP's sharing the first two octests (subnet mask
+    /// 255.255.0.0 for ipv4)
+    max_connections_shared_prefix: u32,
 
     /// Current total connections
     total_connections: AtomicI32,
 
+    /// Current connections by octet prefix
+    total_prefixed_connections: Mutex<HashMap<[u8; 2], u32>>,
+
     metric_connections: IntGauge,
 }
 
+fn get_prefix(addr: &IpAddr) -> [u8; 2] {
+    match addr {
+        IpAddr::V4(ipv4) => ipv4.octets()[..2].try_into().unwrap(),
+        IpAddr::V6(ipv6) => ipv6.octets()[..2].try_into().unwrap(),
+    }
+}
+
 impl GlobalLimits {
-    pub fn new(max_connections_total: u32, metric: &Metrics) -> GlobalLimits {
+    pub fn new(
+        max_connections_total: u32,
+        max_connections_shared_prefix: u32,
+        metric: &Metrics,
+    ) -> GlobalLimits {
         GlobalLimits {
             max_connections_total: max_connections_total as i32,
+            max_connections_shared_prefix,
             total_connections: AtomicI32::new(0),
+            total_prefixed_connections: Mutex::new(HashMap::new()),
             metric_connections: metric.gauge_int(prometheus::Opts::new(
                 "electrscash_rpc_connections",
                 "# of RPC connections",
@@ -30,7 +56,23 @@ impl GlobalLimits {
 
     /// Increase connection count. Fails if maximum number of connections has
     /// been reached. Returns the new connection count.
-    pub fn inc_connection(&self) -> Result<u32> {
+    pub fn inc_connection(&self, addr: &IpAddr) -> Result<(u32, u32)> {
+        let mut prefix_table = self.total_prefixed_connections.lock().unwrap();
+
+        let prefix_count = match prefix_table.entry(get_prefix(addr)) {
+            Entry::Occupied(o) => o.into_mut(),
+            Entry::Vacant(v) => v.insert(0),
+        };
+
+        if *prefix_count >= self.max_connections_shared_prefix {
+            bail!(format!(
+                "Maximum connection limit of {} reached for IP prefix {:?}.",
+                self.max_connections_shared_prefix,
+                get_prefix(addr)
+            ))
+        }
+
+        // Check and update total connection limit.
         let c =
             self.total_connections
                 .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |current| {
@@ -47,15 +89,30 @@ impl GlobalLimits {
                 self.max_connections_total
             ))
         };
-        let c = c.unwrap();
+
+        // All checks done, we can bump the prefix count now.
+        *prefix_count += 1;
+
         // fetch_update fetches the *previous* value, that we succesfully bumped by one.
-        let c = c + 1;
+        let c = c.unwrap() + 1;
         self.metric_connections.set(c as i64);
-        Ok(c as u32)
+        Ok((c as u32, *prefix_count as u32))
     }
 
     /// Decreases connection count.
-    pub fn dec_connection(&self) -> Result<u32> {
+    pub fn dec_connection(&self, addr: &IpAddr) -> Result<(u32, u32)> {
+        let mut prefix_table = self.total_prefixed_connections.lock().unwrap();
+        let prefix_count;
+        match prefix_table.get_mut(&get_prefix(&addr)) {
+            Some(count) => {
+                *count -= 1;
+                prefix_count = *count;
+            }
+            None => {
+                warn!("IP not found in prefix table");
+                prefix_count = 0;
+            }
+        };
         let c =
             self.total_connections
                 .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |current| {
@@ -68,16 +125,18 @@ impl GlobalLimits {
         if c.is_err() {
             bail!("Cannot decrease connection counter. Already at zero.");
         }
-        let c = c.unwrap();
         // fetch_update fetches the *previous* value, that we succesfully decreased by one.
-        let c = c - 1;
+        let c = c.unwrap() - 1;
         self.metric_connections.set(c as i64);
-        Ok(c as u32)
+        Ok((c as u32, prefix_count))
     }
 
-    /// Get maximum connections allowed
-    pub fn max_connections(&self) -> u32 {
-        self.max_connections_total as u32
+    /// connection limits as a tuple
+    pub fn connection_limits(&self) -> (u32, u32) {
+        (
+            self.max_connections_total as u32,
+            self.max_connections_shared_prefix,
+        )
     }
 }
 
@@ -128,5 +187,54 @@ impl ConnectionLimits {
             self.max_alias_bytes
         ))
         .into())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use std::net::{Ipv4Addr, Ipv6Addr};
+
+    #[test]
+    fn test_ip_shared_prefix() {
+        let metrics = Metrics::dummy();
+
+        let prefix_limit = 2;
+        let limits = GlobalLimits::new(100, prefix_limit, &metrics);
+
+        // Set of 3 ips that share the same two-octest prefix
+        let ipv4_addr1 = Ipv4Addr::new(1, 2, 0, 4);
+        let ipv4_addr2 = Ipv4Addr::new(1, 2, 100, 5);
+        let ipv4_addr3 = Ipv4Addr::new(1, 2, 254, 6);
+
+        let ipv6_addr1 = Ipv6Addr::new(1, 2, 1, 0, 0, 0, 0, 0);
+        let ipv6_addr2 = Ipv6Addr::new(1, 2, 2, 0, 0, 0, 0, 0);
+        let ipv6_addr3 = Ipv6Addr::new(1, 2, 3, 0, 0, 0, 0, 0);
+
+        // Different prefix
+        let ipv4_addr4 = Ipv4Addr::new(1, 3, 0, 4);
+        let ipv6_addr4 = Ipv6Addr::new(0xf00d, 2, 1, 0, 0, 0, 0, 0);
+
+        // Ipv4
+        //
+        assert_eq!(limits.inc_connection(&ipv4_addr1.into()).unwrap(), (1, 1));
+        assert_eq!(limits.inc_connection(&ipv4_addr2.into()).unwrap(), (2, 2));
+        assert!(limits.inc_connection(&ipv4_addr3.into()).is_err());
+        assert_eq!(limits.inc_connection(&ipv4_addr4.into()).unwrap(), (3, 1));
+
+        // Disconnecting addr1 should allow for addr3 to connect
+        assert_eq!(limits.dec_connection(&ipv4_addr1.into()).unwrap(), (2, 1));
+        assert_eq!(limits.inc_connection(&ipv4_addr3.into()).unwrap(), (3, 2));
+
+        // Ipv6
+        //
+        assert_eq!(limits.inc_connection(&ipv6_addr1.into()).unwrap(), (4, 1));
+        assert_eq!(limits.inc_connection(&ipv6_addr2.into()).unwrap(), (5, 2));
+        assert!(limits.inc_connection(&ipv6_addr3.into()).is_err());
+        assert_eq!(limits.inc_connection(&ipv6_addr4.into()).unwrap(), (6, 1));
+
+        // Disconnecting addr1 should allow for addr3 to connect
+        assert_eq!(limits.dec_connection(&ipv6_addr1.into()).unwrap(), (5, 1));
+        assert_eq!(limits.inc_connection(&ipv6_addr3.into()).unwrap(), (6, 2));
     }
 }

@@ -93,7 +93,11 @@ fn run_server(config: &Config) -> Result<()> {
         config.scripthash_subscription_limit,
         config.scripthash_alias_bytes_limit,
     );
-    let global_limits = Arc::new(GlobalLimits::new(config.rpc_max_connections, &*metrics));
+    let global_limits = Arc::new(GlobalLimits::new(
+        config.rpc_max_connections,
+        config.rpc_max_connections_shared_prefix,
+        &*metrics,
+    ));
 
     let mut server: Option<RPC> = None; // Electrum RPC server
 
