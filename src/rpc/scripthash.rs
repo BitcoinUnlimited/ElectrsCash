@@ -1,6 +1,6 @@
 use crate::errors::*;
 use crate::mempool::MEMPOOL_HEIGHT;
-use crate::query::FundingOutput;
+use crate::query::primitives::FundingOutput;
 use crate::query::{Query, Status};
 use crate::scripthash::{FullHash, ToLEHex};
 use crate::timeout::TimeoutTrigger;
@@ -99,7 +99,7 @@ pub fn listunspent(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::query::ConfirmationState;
+    use crate::mempool::ConfirmationState;
     use bitcoincash::hash_types::Txid;
     use bitcoincash::hashes::hex::FromHex;
     use serde_json::from_str;

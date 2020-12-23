@@ -494,7 +494,7 @@ impl RPC {
         txid: &Txid,
         blockhash: Option<&BlockHash>,
     ) -> Result<Vec<FullHash>> {
-        let txn = self.query.load_txn(txid, blockhash, None)?;
+        let txn = self.query.tx().get(txid, blockhash, None)?;
         let mut scripthashes = get_output_scripthash(&txn, None);
 
         for txin in txn.input {
@@ -504,7 +504,7 @@ impl RPC {
             let id: &Txid = &txin.previous_output.txid;
             let n = txin.previous_output.vout as usize;
 
-            let txn = self.query.load_txn(&id, None, None)?;
+            let txn = self.query.tx().get(&id, None, None)?;
             scripthashes.extend(get_output_scripthash(&txn, Some(n)));
         }
         Ok(scripthashes)
