@@ -50,6 +50,18 @@ impl TxQuery {
         self.load_txn_from_bitcoind(txid, hash.as_ref())
     }
 
+    /// Get an transaction known to be unconfirmed.
+    ///
+    /// This is slightly faster that `get` as it avoids blockhash lookup. May
+    /// or may not return the transaction even if it is confirmed.
+    pub fn get_unconfirmed(&self, txid: &Txid) -> Result<Transaction> {
+        if let Some(tx) = self.tx_cache.get(txid) {
+            Ok(tx)
+        } else {
+            self.load_txn_from_bitcoind(txid, None)
+        }
+    }
+
     fn load_txn_from_bitcoind(
         &self,
         txid: &Txid,

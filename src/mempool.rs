@@ -9,6 +9,7 @@ use crate::daemon::{Daemon, MempoolEntry};
 use crate::errors::*;
 use crate::index::index_transaction;
 use crate::metrics::Metrics;
+use crate::query::tx::TxQuery;
 use crate::store::{ReadStore, Row};
 use crate::util::Bytes;
 
@@ -209,7 +210,7 @@ impl Tracker {
         &self.index
     }
 
-    pub fn update(&mut self, daemon: &Daemon) -> Result<HashSet<Txid>> {
+    pub fn update(&mut self, daemon: &Daemon, txquery: &TxQuery) -> Result<HashSet<Txid>> {
         // set of transactions where a change has occurred (either new or removed)
         let mut changed_txs: HashSet<Txid> = HashSet::new();
 
@@ -222,34 +223,26 @@ impl Tracker {
 
         let timer = self.stats.start_timer("add");
         let txids_iter = new_txids.difference(&old_txids);
-        let entries: Vec<(&Txid, MempoolEntry)> = txids_iter
-            .filter_map(|txid| {
-                match daemon.getmempoolentry(txid) {
-                    Ok(entry) => Some((txid, entry)),
-                    Err(err) => {
-                        debug!("no mempool entry {}: {}", txid, err); // e.g. new block or RBF
-                        None // ignore this transaction for now
-                    }
-                }
-            })
-            .collect();
-        if !entries.is_empty() {
-            let txids: Vec<&Txid> = entries.iter().map(|(txid, _)| *txid).collect();
-            let txs = match daemon.gettransactions(&txids) {
-                Ok(txs) => txs,
+        for txid in txids_iter {
+            let entry = match daemon.getmempoolentry(txid) {
+                Ok(e) => e,
                 Err(err) => {
-                    // e.g. new block or RBF
+                    debug!("no mempool entry {}: {}", txid, err);
+                    continue;
+                }
+            };
+            let tx = match txquery.get_unconfirmed(txid) {
+                Ok(tx) => tx,
+                Err(err) => {
+                    // e.g. new block or double spend
                     // keep the mempool until next update()
-                    debug!("failed to get transactions {:?}: {}", txids, err);
+                    debug!("failed to get transaction {:?}: {}", txid, err);
                     let empty: HashSet<Txid> = HashSet::new();
                     return Ok(empty);
                 }
             };
-            for ((txid, entry), tx) in entries.into_iter().zip(txs.into_iter()) {
-                assert_eq!(tx.txid(), *txid);
-                self.add(txid, tx, entry);
-            }
-            changed_txs = txids.iter().map(|txid| *(*txid)).collect();
+            self.add(txid, tx, entry);
+            changed_txs.insert(*txid);
         }
         timer.observe_duration();
 
