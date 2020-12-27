@@ -231,6 +231,41 @@ impl Query {
         }))
     }
 
+    pub fn status_mempool(
+        &self,
+        scripthash: &FullHash,
+        timeout: &TimeoutTrigger,
+    ) -> Result<Status> {
+        let store = self.app.read_store();
+        let confirmed_funding = self
+            .confirmed
+            .get_funding(store, scripthash, &*self.tx, timeout)
+            .chain_err(|| "failed to get confirmed funding status")?;
+
+        let tracker = self.tracker.read().unwrap();
+        let unconfirmed_funding = self
+            .unconfirmed
+            .get_funding(&tracker, scripthash, timeout)
+            .chain_err(|| "failed to get unconfirmed spending status")?;
+
+        let unconfirmed_spending = self
+            .unconfirmed
+            .get_spending(&tracker, &confirmed_funding, &unconfirmed_funding, timeout)
+            .chain_err(|| "failed to get unconfirmed spending status")?;
+
+        let txn_fees =
+            self.unconfirmed
+                .get_tx_fees(&tracker, &unconfirmed_funding, &unconfirmed_spending);
+        let confirmed = (vec![], vec![]);
+        let mempool = (unconfirmed_funding, unconfirmed_spending);
+
+        Ok(Status {
+            confirmed,
+            mempool,
+            txn_fees,
+        })
+    }
+
     pub fn status(&self, scripthash: &FullHash, timeout: &TimeoutTrigger) -> Result<Status> {
         let store = self.app.read_store();
         let confirmed_funding = self

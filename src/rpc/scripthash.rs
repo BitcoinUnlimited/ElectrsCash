@@ -73,12 +73,28 @@ pub fn get_first_use(query: &Query, scripthash: &FullHash) -> Result<Value> {
         "tx_hash": firstuse.1.to_hex()
     }))
 }
+
 pub fn get_history(
     query: &Query,
     scripthash: &FullHash,
     timeout: &TimeoutTrigger,
 ) -> Result<Value> {
     let status = query.status(&scripthash, timeout)?;
+    Ok(json!(Value::Array(
+        status
+            .history()
+            .into_iter()
+            .map(|item| item.to_json())
+            .collect()
+    )))
+}
+
+pub fn get_mempool(
+    query: &Query,
+    scripthash: &FullHash,
+    timeout: &TimeoutTrigger,
+) -> Result<Value> {
+    let status = query.status_mempool(&scripthash, timeout)?;
     Ok(json!(Value::Array(
         status
             .history()

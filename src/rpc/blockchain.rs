@@ -6,7 +6,7 @@ use crate::rpc::parseutil::{
     usize_from_value, usize_from_value_or,
 };
 use crate::rpc::rpcstats::RPCStats;
-use crate::rpc::scripthash::{get_balance, get_first_use, get_history, listunspent};
+use crate::rpc::scripthash::{get_balance, get_first_use, get_history, get_mempool, listunspent};
 use crate::scripthash::addr_to_scripthash;
 use crate::scripthash::{FullHash, ToLEHex};
 use crate::timeout::TimeoutTrigger;
@@ -69,6 +69,12 @@ impl BlockchainRPC {
         let addr = str_from_value(params.get(0), "address")?;
         let scripthash = addr_to_scripthash(&addr)?;
         get_history(&self.query, &scripthash, timeout)
+    }
+
+    pub fn address_get_mempool(&self, params: &[Value], timeout: &TimeoutTrigger) -> Result<Value> {
+        let addr = str_from_value(params.get(0), "address")?;
+        let scripthash = addr_to_scripthash(&addr)?;
+        get_mempool(&self.query, &scripthash, timeout)
     }
 
     pub fn address_get_scripthash(&self, params: &[Value]) -> Result<Value> {
@@ -220,6 +226,15 @@ impl BlockchainRPC {
     ) -> Result<Value> {
         let scripthash = scripthash_from_value(params.get(0))?;
         get_history(&self.query, &scripthash, timeout)
+    }
+
+    pub fn scripthash_get_mempool(
+        &self,
+        params: &[Value],
+        timeout: &TimeoutTrigger,
+    ) -> Result<Value> {
+        let scripthash = scripthash_from_value(params.get(0))?;
+        get_mempool(&self.query, &scripthash, timeout)
     }
 
     pub fn scripthash_listunspent(
