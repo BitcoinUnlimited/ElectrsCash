@@ -600,6 +600,7 @@ dependencies = [
  "protobuf",
  "rand",
  "rocksdb",
+ "rust_decimal",
  "serde",
  "serde_derive",
  "serde_json",
@@ -1376,6 +1377,16 @@ name = "roff"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e33e4fb37ba46888052c763e4ec2acfedd8f00f62897b630cadb6298b833675e"
+
+[[package]]
+name = "rust_decimal"
+version = "1.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c9e81662973c7a8d9663e64a0de4cd642b89a21d64966e3d99606efdc5fb0cc6"
+dependencies = [
+ "num-traits",
+ "serde",
+]
 
 [[package]]
 name = "rustc-demangle"

@@ -282,51 +282,7 @@ impl BlockchainRPC {
             let tx = self.query.tx().get(&tx_hash, None, None)?;
             Ok(json!(hex::encode(serialize(&tx))))
         } else {
-            let header = self.query.header().get_by_txid(&tx_hash, None)?;
-            let blocktime = match header {
-                Some(ref header) => header.header().time,
-                None => 0,
-            };
-            let height = match header {
-                Some(ref header) => header.height(),
-                None => 0,
-            };
-            let confirmations = match header {
-                Some(ref header) => {
-                    if let Some(best) = self.query.header().best() {
-                        best.height() - header.height()
-                    } else {
-                        0
-                    }
-                }
-                None => 0,
-            };
-            let blockhash = header.map(|h| *h.hash());
-            let tx = self.query.tx().get(&tx_hash, blockhash.as_ref(), None)?;
-
-            let tx_serialized = serialize(&tx);
-            Ok(json!({
-                "blockhash": blockhash.unwrap_or_default().to_hex(),
-                "blocktime": blocktime,
-                "height": height,
-                "confirmations": confirmations,
-                "hash": tx.txid().to_hex(),
-                "txid": tx.txid().to_hex(),
-                "size": tx_serialized.len(),
-                "hex": hex::encode(tx_serialized),
-                "locktime": tx.lock_time,
-                "time": blocktime,
-                "vin": tx.input.iter().map(|txin| json!({
-                    "sequence": txin.sequence,
-                    "txid": txin.previous_output.txid.to_hex(),
-                    "vout": txin.previous_output.vout,
-                    "scriptSig": txin.script_sig.to_hex(),
-                })).collect::<Vec<Value>>(),
-                "vout": tx.output.iter().map(|txout| json!({
-                    "value": txout.value,
-                    "scriptPubKey": txout.script_pubkey.to_hex()
-                })).collect::<Vec<Value>>(),
-            }))
+            self.query.tx().get_verbose(&tx_hash)
         }
     }
 
