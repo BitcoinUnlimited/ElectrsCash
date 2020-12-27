@@ -337,7 +337,20 @@ impl BlockchainRPC {
 
     pub fn transaction_get_merkle(&self, params: &[Value]) -> Result<Value> {
         let tx_hash = hash_from_value::<Txid>(params.get(0))?;
-        let height = usize_from_value(params.get(1), "height")?;
+        let height = if params.get(1).is_some() {
+            usize_from_value(params.get(1), "height")
+        } else {
+            let header = self.query.lookup_blockheader(&tx_hash, None)?;
+            match header {
+                Some(header) => Ok(header.height()),
+                None => Err(rpc_arg_error(&format!(
+                    "Transaction '{}' is not confirmed in a block",
+                    tx_hash.to_hex()
+                ))
+                .into()),
+            }
+        }?;
+
         let (merkle, pos) = self
             .query
             .get_merkle_proof(&tx_hash, height)
