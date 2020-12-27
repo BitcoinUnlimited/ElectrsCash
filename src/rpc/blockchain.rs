@@ -340,7 +340,7 @@ impl BlockchainRPC {
         let height = if params.get(1).is_some() {
             usize_from_value(params.get(1), "height")
         } else {
-            let header = self.query.lookup_blockheader(&tx_hash, None)?;
+            let header = self.query.header().get_by_txid(&tx_hash, None)?;
             match header {
                 Some(header) => Ok(header.height()),
                 None => Err(rpc_arg_error(&format!(
