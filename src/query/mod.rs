@@ -394,7 +394,10 @@ impl Query {
             .duration
             .with_label_values(&["update_mempool"])
             .start_timer();
-        self.tracker.write().unwrap().update(self.app.daemon())
+        self.tracker
+            .write()
+            .unwrap()
+            .update(self.app.daemon(), self.tx())
     }
 
     /// Returns [vsize, fee_rate] pairs (measured in vbytes and satoshis).

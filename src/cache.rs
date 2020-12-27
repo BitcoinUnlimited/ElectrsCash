@@ -5,7 +5,7 @@ use crate::rndcache::RndCache;
 use bitcoincash::blockdata::transaction::Transaction;
 use bitcoincash::consensus::encode::deserialize;
 use bitcoincash::hash_types::{BlockHash, Txid};
-use std::sync::Mutex;
+use std::sync::{Mutex, RwLock};
 
 pub struct BlockTxIDsCache {
     map: Mutex<RndCache<BlockHash, Vec<Txid>>>,
@@ -62,7 +62,7 @@ impl BlockTxIDsCache {
 
 pub struct TransactionCache {
     // Store serialized transaction (should use less RAM).
-    map: Mutex<RndCache<Txid, Vec<u8>>>,
+    map: RwLock<RndCache<Txid, Vec<u8>>>,
 }
 
 impl TransactionCache {
@@ -90,12 +90,12 @@ impl TransactionCache {
             "# of entries in the transaction cache",
         ));
         TransactionCache {
-            map: Mutex::new(RndCache::new(bytes_capacity, lookups, churn, size, entries)),
+            map: RwLock::new(RndCache::new(bytes_capacity, lookups, churn, size, entries)),
         }
     }
 
     pub fn get(&self, txid: &Txid) -> Option<Transaction> {
-        if let Some(serialized_txn) = self.map.lock().unwrap().get(txid) {
+        if let Some(serialized_txn) = self.map.read().unwrap().get(txid) {
             if let Ok(tx) = deserialize(&serialized_txn) {
                 return Some(tx);
             } else {
@@ -109,7 +109,7 @@ impl TransactionCache {
         serialized_tx.shrink_to_fit();
         let size = serialized_tx.capacity();
         self.map
-            .lock()
+            .write()
             .unwrap()
             .put(*txid, serialized_tx, size as u64);
     }
