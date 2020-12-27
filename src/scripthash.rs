@@ -1,8 +1,7 @@
 use bitcoincash::blockdata::opcodes;
 use bitcoincash::blockdata::script::{Builder, Script};
 use bitcoincash_addr::{Address, HashType};
-use crypto::digest::Digest;
-use crypto::sha2::Sha256;
+use sha2::{Digest, Sha256};
 use std::convert::TryInto;
 
 use crate::errors::*;
@@ -50,11 +49,9 @@ pub fn addr_to_scripthash(addr: &str) -> Result<FullHash> {
 }
 
 pub fn compute_script_hash(data: &[u8]) -> FullHash {
-    let mut hash = FullHash::default();
     let mut sha2 = Sha256::new();
-    sha2.input(data);
-    sha2.result(&mut hash);
-    hash
+    sha2.update(data);
+    sha2.finalize().into()
 }
 
 pub fn decode_scripthash(hexstr: &str) -> Result<FullHash> {

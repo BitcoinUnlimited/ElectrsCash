@@ -4,9 +4,8 @@ use bitcoincash::hash_types::{BlockHash, TxMerkleNode, Txid};
 use bitcoincash::hashes::hex::ToHex;
 use bitcoincash::hashes::sha256d::Hash as Sha256dHash;
 use bitcoincash::hashes::Hash;
-use crypto::digest::Digest;
-use crypto::sha2::Sha256;
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, RwLock};
 
@@ -159,14 +158,12 @@ impl Status {
         if txns.is_empty() {
             None
         } else {
-            let mut hash = FullHash::default();
             let mut sha2 = Sha256::new();
             for item in txns {
                 let part = format!("{}:{}:", item.tx_hash.to_hex(), item.height);
-                sha2.input(part.as_bytes());
+                sha2.update(part.as_bytes());
             }
-            sha2.result(&mut hash);
-            Some(hash)
+            Some(sha2.finalize().into())
         }
     }
 }

@@ -339,9 +339,9 @@ impl Stats {
 
     fn update(&self, block: &Block, height: usize) {
         self.blocks.inc();
-        self.txns.inc_by(block.txdata.len() as i64);
+        self.txns.inc_by(block.txdata.len() as u64);
         for tx in &block.txdata {
-            self.vsize.inc_by(tx.get_weight() as i64 / 4);
+            self.vsize.inc_by((tx.get_weight() / 4) as u64);
         }
         self.update_height(height);
     }

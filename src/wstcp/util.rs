@@ -1,6 +1,5 @@
 use crate::errors::*;
-use crypto::digest::Digest;
-use crypto::sha1::Sha1;
+use sha1::{Digest, Sha1};
 
 const GUID: &str = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 
@@ -8,12 +7,10 @@ const GUID: &str = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 pub struct WebSocketKey(pub String);
 
 pub fn calc_accept_hash(key: &WebSocketKey) -> String {
-    let mut buf: Vec<u8> = vec![0; 20]; // 160 bits
-    let mut sh = Sha1::new();
+    let mut hasher = Sha1::new();
 
-    sh.input_str(&format!("{}{}", key.0, GUID));
-    sh.result(buf.as_mut_slice());
-    base64::encode(&buf)
+    hasher.update(&format!("{}{}", key.0, GUID));
+    base64::encode(&hasher.finalize())
 }
 
 impl From<std::io::Error> for Error {

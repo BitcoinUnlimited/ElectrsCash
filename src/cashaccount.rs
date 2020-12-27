@@ -11,17 +11,14 @@ use cashaccount_sys::{
     cashacc_account_destroy, cashacc_account_init, cashacc_parse_opreturn, CashAccount,
     CASHACC_ERR_MALLOC_FAILED,
 };
-use crypto::digest::Digest;
-use crypto::sha2::Sha256;
+use sha2::{Digest, Sha256};
 use std::ffi::CStr;
 
 fn compute_accountname_hash(accountname: &[u8], blockheight: u32) -> FullHash {
-    let mut hash = FullHash::default();
     let mut sha2 = Sha256::new();
-    sha2.input(accountname);
-    sha2.input(&blockheight.to_be_bytes());
-    sha2.result(&mut hash);
-    hash
+    sha2.update(accountname);
+    sha2.update(&blockheight.to_be_bytes());
+    sha2.finalize().into()
 }
 
 #[derive(Serialize, Deserialize)]
