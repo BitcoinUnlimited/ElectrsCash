@@ -3,8 +3,7 @@ env_prefix = "ELECTRSCASH"
 conf_file_param = "conf"
 conf_dir_param = "conf_dir"
 doc = """
-An efficient implementation of Electrum Server, patch set on top of
-electrs.
+An efficient implementation of Electrum Server for Bitcoin Cash.
 
 The motivation behind this project is to improve the Bitcoin Cash infrastructure
 for lightweight clients, providing them with efficient backend services.
@@ -12,9 +11,13 @@ for lightweight clients, providing them with efficient backend services.
 ElectrsCash extends the original Electrum protocol, supporting additional
 technology well established in the ecosystem such as CashAccounts.
 
-The server indexes the entire Bitcoin Cash blockchain, and the resulting index enables fast queries for any given user wallet,
-allowing the user to keep real-time track of his balances and his transaction history using the [Electron Cash wallet](https://electroncash.org/).
-Since it runs on the user's own machine, there is no need for the wallet to communicate with external Electrum servers,
+The server indexes the entire Bitcoin Cash blockchain, and the resulting index
+enables fast queries for blockchain applications and any given user wallet,
+allowing the user to keep real-time track of his balances and his transaction
+history.
+
+When run on the user's own machine, there is no need for the wallet to
+communicate with external Electrum servers,
 thus preserving the privacy of the user's addresses and balances."""
 
 [[switch]]
@@ -59,32 +62,33 @@ doc = "JSONRPC authentication cookie file (default: ~/.bitcoin/.cookie)"
 name = "network"
 type = "crate::config::BitcoinNetwork"
 convert_into = "::bitcoincash::network::constants::Network"
-doc = "Select Bitcoin network type ('bitcoin', 'testnet' or 'regtest')"
+doc = "Select Bitcoin network type ('bitcoin', 'testnet', 'testnet4', 'scalenet' or 'regtest')"
 default = "Default::default()"
 
 [[param]]
 name = "electrum_rpc_addr"
 type = "crate::config::ResolvAddr"
-doc = "Electrum server JSONRPC 'addr:port' to listen on (default: '127.0.0.1:50001' for mainnet, '127.0.0.1:60001' for testnet and '127.0.0.1:60401' for regtest)"
+doc = "Electrum server JSONRPC 'addr:port' to listen on (default: '0.0.0.0:50001' for mainnet, '0.0.0.0:60001' for testnet and '0.0.0.0:60401' for regtest)"
 
 [[param]]
 name = "electrum_ws_addr"
 type = "crate::config::ResolvAddr"
-doc = "Electrum websocket server 'addr:port' to listen on (default: '127.0.0.1:50003' for mainnet, '127.0.0.1:60003' for testnet and '127.0.0.1:60403' for regtest)"
+doc = "Electrum websocket server 'addr:port' to listen on (default: '0.0.0.0:50003' for mainnet, '0.0.0.0:60003' for testnet and '0.0.0.0:60403' for regtest)"
 
 [[param]]
 name = "daemon_rpc_addr"
 type = "crate::config::ResolvAddr"
-doc = "Bitcoin daemon JSONRPC 'addr:port' to connect (default: 127.0.0.1:8332 for mainnet, 127.0.0.1:18332 for testnet and 127.0.0.1:18443 for regtest)"
+doc = "Bitcoin daemon JSONRPC 'addr:port' to connect (default: 127.0.0.1:8332 for mainnet, 127.0.0.1:18332 for testnet, 28332 for testnet4, 38332 for scalenet and 127.0.0.1:18443 for regtest)"
 
 [[param]]
 name = "monitoring_addr"
 type = "crate::config::ResolvAddr"
-doc = "Prometheus monitoring 'addr:port' to listen on (default: 127.0.0.1:4224 for mainnet, 127.0.0.1:14224 for testnet and 127.0.0.1:24224 for regtest)"
+doc = "Prometheus monitoring 'addr:port' to listen on (default: 127.0.0.1:4224 for mainnet, 127.0.0.1:14224 for testnet, 127.0.0.1:34224 for testnet4, 127.0.0.1:44224 for scalenet and 127.0.0.1:24224 for regtest)"
 
 [[switch]]
 name = "jsonrpc_import"
 doc = "Use JSONRPC instead of directly importing blk*.dat files. Useful for remote full node or low memory system"
+default = true
 
 [[param]]
 name = "wait_duration_secs"
@@ -108,13 +112,13 @@ default = "0"
 name = "tx_cache_size_mb"
 type = "f32"
 doc = "Total size of transactions to cache (MB)"
-default = "150.0"
+default = "250.0"
 
 [[param]]
 name = "blocktxids_cache_size_mb"
 type = "f32"
 doc = "Total size of block transactions IDs to cache (in MB)"
-default = "150.0"
+default = "50.0"
 
 [[param]]
 name = "txid_limit"
@@ -156,7 +160,7 @@ default = "2000"
 name = "scripthash_subscription_limit"
 type = "u32"
 doc = "The maximum number of scripthash subscriptions per connection"
-default = "150000"
+default = "250000"
 
 [[param]]
 name = "scripthash_alias_bytes_limit"
@@ -168,10 +172,10 @@ default = "100000"
 name = "rpc_max_connections"
 type = "u32"
 doc = "Maximum number of simultaneous RPC connections."
-default = "500"
+default = "2000"
 
 [[param]]
 name = "rpc_max_connections_shared_prefix"
 type = "u32"
 doc = "Maximum number of simultaneous RPC connections from IP's sharing first two octets (255.255.0.0 for IPv4)."
-default = "100"
+default = "500"
