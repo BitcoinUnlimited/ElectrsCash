@@ -1,7 +1,7 @@
 use crate::errors::*;
 use crate::metrics::Metrics;
 
-use prometheus::IntGauge;
+use prometheus::{IntCounter, IntGauge};
 
 use std::convert::TryInto;
 use std::net::IpAddr;
@@ -11,6 +11,13 @@ use std::sync::Mutex;
 
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
+
+struct ConnectionMetrics {
+    connections: IntGauge,
+    connections_rejected_global: IntCounter,
+    connections_rejected_prefix: IntCounter,
+    connections_total: IntCounter,
+}
 
 pub struct GlobalLimits {
     /// Maximum number of connections we accept in total.
@@ -26,7 +33,7 @@ pub struct GlobalLimits {
     /// Current connections by octet prefix
     total_prefixed_connections: Mutex<HashMap<[u8; 2], u32>>,
 
-    metric_connections: IntGauge,
+    metrics: ConnectionMetrics,
 }
 
 fn get_prefix(addr: &IpAddr) -> [u8; 2] {
@@ -47,16 +54,31 @@ impl GlobalLimits {
             max_connections_shared_prefix,
             total_connections: AtomicI32::new(0),
             total_prefixed_connections: Mutex::new(HashMap::new()),
-            metric_connections: metric.gauge_int(prometheus::Opts::new(
-                "electrscash_rpc_connections",
-                "# of RPC connections",
-            )),
+            metrics: ConnectionMetrics {
+                connections: metric.gauge_int(prometheus::Opts::new(
+                    "electrscash_rpc_connections",
+                    "# of RPC connections",
+                )),
+                connections_rejected_global: metric.counter_int(prometheus::Opts::new(
+                    "electrscash_rpc_connections_rejected_global",
+                    "# of rejected RPC connections due to global slot limits",
+                )),
+                connections_rejected_prefix: metric.counter_int(prometheus::Opts::new(
+                    "electrscash_rpc_connections_rejected_prefix",
+                    "# of rejected RPC connections due to prefix slot limits",
+                )),
+                connections_total: metric.counter_int(prometheus::Opts::new(
+                    "electrscash_rpc_connections_total",
+                    "# of RPC connections since server start",
+                )),
+            },
         }
     }
 
     /// Increase connection count. Fails if maximum number of connections has
     /// been reached. Returns the new connection count.
     pub fn inc_connection(&self, addr: &IpAddr) -> Result<(u32, u32)> {
+        self.metrics.connections_total.inc();
         let mut prefix_table = self.total_prefixed_connections.lock().unwrap();
 
         let prefix_count = match prefix_table.entry(get_prefix(addr)) {
@@ -65,6 +87,7 @@ impl GlobalLimits {
         };
 
         if *prefix_count >= self.max_connections_shared_prefix {
+            self.metrics.connections_rejected_prefix.inc();
             bail!(format!(
                 "Maximum connection limit of {} reached for IP prefix {:?}.",
                 self.max_connections_shared_prefix,
@@ -84,6 +107,7 @@ impl GlobalLimits {
                 });
 
         if c.is_err() {
+            self.metrics.connections_rejected_global.inc();
             bail!(format!(
                 "Maximum connection limit of {} reached.",
                 self.max_connections_total
@@ -95,7 +119,7 @@ impl GlobalLimits {
 
         // fetch_update fetches the *previous* value, that we succesfully bumped by one.
         let c = c.unwrap() + 1;
-        self.metric_connections.set(c as i64);
+        self.metrics.connections.set(c as i64);
         Ok((c as u32, *prefix_count as u32))
     }
 
@@ -127,7 +151,7 @@ impl GlobalLimits {
         }
         // fetch_update fetches the *previous* value, that we succesfully decreased by one.
         let c = c.unwrap() - 1;
-        self.metric_connections.set(c as i64);
+        self.metrics.connections.set(c as i64);
         Ok((c as u32, prefix_count))
     }
 
