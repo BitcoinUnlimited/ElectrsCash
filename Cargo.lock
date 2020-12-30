@@ -600,6 +600,7 @@ dependencies = [
  "prometheus",
  "protobuf",
  "rand",
+ "rayon",
  "rocksdb",
  "rust_decimal",
  "serde",
