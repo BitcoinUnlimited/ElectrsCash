@@ -10,11 +10,8 @@ use crate::util::{hash_prefix, HashPrefix};
 use bitcoincash::blockdata::transaction::Transaction;
 use bitcoincash::consensus::encode::deserialize;
 use bitcoincash::hash_types::Txid;
-
-pub struct TxnHeight {
-    pub txn: Transaction,
-    pub height: u32,
-}
+use genawaiter::sync::gen;
+use genawaiter::yield_;
 
 // TODO: the functions below can be part of ReadStore.
 pub fn txrow_by_txid(store: &dyn ReadStore, txid: &Txid) -> Option<TxRow> {
@@ -138,52 +135,44 @@ pub fn find_spending_input(
         }
     }
 
-    // ambiguity, fetch from bitcoind to verify
-    let spending_txns: Vec<TxnHeight> = load_txns_by_prefix(
-        store,
-        txids_by_funding_output(store, &funding.txn_id, funding.output_index),
-        txquery,
-    )?;
-    let mut spending_inputs = vec![];
-    for t in &spending_txns {
-        for input in t.txn.input.iter() {
-            if input.previous_output.txid == funding.txn_id
-                && input.previous_output.vout == funding.output_index as u32
-            {
-                spending_inputs.push(SpendingInput {
-                    txn_id: t.txn.txid(),
-                    height: t.height,
-                    funding_output: (funding.txn_id, funding.output_index),
-                    value: funding.value,
-                    state: confirmation_state(mempool, &t.txn.txid(), t.height),
-                })
+    // Ambiguity, fetch from bitcoind to verify
+    for (height, tx) in load_txns_by_prefix(store, spending_txns, txquery) {
+        let tx = tx?;
+        for input in tx.input.iter() {
+            if input.previous_output.vout != funding.output_index as u32 {
+                continue;
             }
+            if input.previous_output.txid != funding.txn_id {
+                continue;
+            }
+            let txid = tx.txid();
+            let state = confirmation_state(mempool, &txid, height);
+            return Ok(Some(SpendingInput {
+                txn_id: txid,
+                height,
+                funding_output: (funding.txn_id, funding.output_index),
+                value: funding.value,
+                state,
+            }));
         }
         timeout.check()?;
     }
-    assert!(spending_inputs.len() <= 1);
-    Ok(if spending_inputs.len() == 1 {
-        Some(spending_inputs.remove(0))
-    } else {
-        None
-    })
+    Ok(None)
 }
 
-pub fn load_txns_by_prefix(
-    store: &dyn ReadStore,
+pub fn load_txns_by_prefix<'a>(
+    store: &'a dyn ReadStore,
     prefixes: Vec<HashPrefix>,
-    txquery: &TxQuery,
-) -> Result<Vec<TxnHeight>> {
-    let mut txns = vec![];
-    for txid_prefix in prefixes {
-        for tx_row in txrows_by_prefix(store, txid_prefix) {
-            let txid: Txid = deserialize(&tx_row.key.txid).unwrap();
-            let txn = txquery.get(&txid, None, Some(tx_row.height))?;
-            txns.push(TxnHeight {
-                txn,
-                height: tx_row.height,
-            })
+    txquery: &'a TxQuery,
+) -> impl Iterator<Item = (u32, Result<Transaction>)> + 'a {
+    gen!({
+        for txid_prefix in prefixes {
+            for tx_row in txrows_by_prefix(store, txid_prefix) {
+                let txid: Txid = deserialize(&tx_row.key.txid).unwrap();
+                let txn = txquery.get(&txid, None, Some(tx_row.height));
+                yield_!((tx_row.height, txn));
+            }
         }
-    }
-    Ok(txns)
+    })
+    .into_iter()
 }

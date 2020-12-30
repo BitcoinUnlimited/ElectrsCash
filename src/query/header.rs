@@ -48,4 +48,8 @@ impl HeaderQuery {
     pub fn best(&self) -> Option<HeaderEntry> {
         self.app.index().best_header()
     }
+
+    pub fn at_height(&self, height: usize) -> Option<HeaderEntry> {
+        self.app.index().get_header(height)
+    }
 }

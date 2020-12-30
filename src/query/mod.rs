@@ -19,9 +19,7 @@ use crate::metrics::Metrics;
 use crate::query::confirmed::ConfirmedQuery;
 use crate::query::header::HeaderQuery;
 use crate::query::primitives::{FundingOutput, OutPoint, SpendingInput};
-use crate::query::queryutil::{
-    load_txns_by_prefix, txoutrows_by_script_hash, txrows_by_prefix, TxnHeight,
-};
+use crate::query::queryutil::{load_txns_by_prefix, txoutrows_by_script_hash, txrows_by_prefix};
 use crate::query::tx::TxQuery;
 use crate::query::unconfirmed::UnconfirmedQuery;
 use crate::scripthash::{compute_script_hash, FullHash};
@@ -460,17 +458,11 @@ impl Query {
     }
 
     pub fn get_cashaccount_txs(&self, name: &str, height: u32) -> Result<Value> {
-        let cashaccount_txns: Vec<TxnHeight> = load_txns_by_prefix(
+        let cashaccount_txs = load_txns_by_prefix(
             self.app.read_store(),
             txids_by_cashaccount(self.app.read_store(), name, height),
             &self.tx,
-        )?;
-
-        // filter on name in case of txid prefix collision
-        let parser = CashAccountParser::new(None);
-        let cashaccount_txns = cashaccount_txns
-            .iter()
-            .filter(|txn| parser.has_cashaccount(&txn.txn, name));
+        );
 
         #[derive(Serialize, Deserialize, Debug)]
         struct AccountTx {
@@ -478,23 +470,33 @@ impl Query {
             height: u32,
             blockhash: String,
         };
-
         let header = self
-            .app
-            .index()
-            .get_header(height as usize)
+            .header()
+            .at_height(height as usize)
             .chain_err(|| format!("missing header at height {}", height))?;
-        let blockhash = *header.hash();
+        let blockhash = header.hash().to_hex();
 
-        let cashaccount_txns: Vec<AccountTx> = cashaccount_txns
-            .map(|txn| AccountTx {
-                tx: hex::encode(&serialize(&txn.txn)),
-                height: txn.height,
-                blockhash: blockhash.to_hex(),
+        let mut result: Vec<AccountTx> = vec![];
+        let parser = CashAccountParser::new(None);
+
+        for (_, tx) in cashaccount_txs {
+            let tx = tx?;
+
+            // Filter on name in case of txid prefix collision
+            if !parser.has_cashaccount(&tx, name) {
+                continue;
+            }
+
+            result.push({
+                AccountTx {
+                    tx: hex::encode(&serialize(&tx)),
+                    height,
+                    blockhash: blockhash.clone(),
+                }
             })
-            .collect();
+        }
 
-        Ok(json!(cashaccount_txns))
+        Ok(json!(result))
     }
 
     /// Find first outputs to scripthash
