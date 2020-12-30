@@ -10,8 +10,7 @@ use crate::util::{hash_prefix, HashPrefix};
 use bitcoincash::blockdata::transaction::Transaction;
 use bitcoincash::consensus::encode::deserialize;
 use bitcoincash::hash_types::Txid;
-use genawaiter::sync::gen;
-use genawaiter::yield_;
+use genawaiter::{sync::gen, yield_};
 
 // TODO: the functions below can be part of ReadStore.
 pub fn txrow_by_txid(store: &dyn ReadStore, txid: &Txid) -> Option<TxRow> {
@@ -133,6 +132,9 @@ pub fn find_spending_input(
                 state: confirmation_state(mempool, &txid, txrows[0].height),
             }));
         }
+    }
+    if spending_txns.is_empty() {
+        return Ok(None);
     }
 
     // Ambiguity, fetch from bitcoind to verify

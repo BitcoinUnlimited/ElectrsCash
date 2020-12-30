@@ -7,6 +7,7 @@ use crate::query::tx::TxQuery;
 use crate::scripthash::FullHash;
 use crate::store::ReadStore;
 use crate::timeout::TimeoutTrigger;
+use rayon::prelude::*;
 use std::sync::Arc;
 
 pub struct ConfirmedQuery {
@@ -34,7 +35,7 @@ impl ConfirmedQuery {
         let funding = txoutrows_by_script_hash(read_store, scripthash);
         timeout.check()?;
         let funding = funding
-            .iter()
+            .par_iter()
             .map(|outrow| txoutrow_to_fundingoutput(read_store, outrow, None, txquery, timeout))
             .collect();
         timer.observe_duration();
@@ -56,16 +57,16 @@ impl ConfirmedQuery {
             .with_label_values(&["confirmed_status_spending"])
             .start_timer();
 
-        let mut spending = vec![];
-
-        for funding_output in confirmed_funding {
-            timeout.check()?;
-            if let Some(spent) =
-                find_spending_input(read_store, &funding_output, None, &*self.txquery, timeout)?
-            {
-                spending.push(spent);
-            }
-        }
+        let spending: Result<Vec<Option<SpendingInput>>> = confirmed_funding
+            .par_iter()
+            .map(|funding_output| {
+                timeout.check().and_then(|_| {
+                    find_spending_input(read_store, &funding_output, None, &*self.txquery, timeout)
+                })
+            })
+            .collect();
+        let spending = spending?;
+        let spending: Vec<SpendingInput> = spending.into_iter().filter_map(|s| s).collect();
         timer.observe_duration();
         Ok(spending)
     }
