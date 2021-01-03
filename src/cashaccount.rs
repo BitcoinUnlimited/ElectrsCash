@@ -138,7 +138,7 @@ impl CashAccountParser {
         }
     }
 
-    pub fn index_cashaccount<'a>(&self, txn: &'a Transaction, blockheight: u32) -> Option<Row> {
+    pub fn index_cashaccount(&self, txn: &Transaction, blockheight: u32) -> Option<Row> {
         if !is_valid_cashaccount_height(self.activation_height, blockheight) {
             return None;
         }

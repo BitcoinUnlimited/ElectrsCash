@@ -3,7 +3,6 @@ use bitcoincash::hash_types::BlockHash;
 use std::collections::HashMap;
 use std::convert::TryInto;
 use std::fmt;
-use std::iter::FromIterator;
 use std::slice;
 use std::sync::mpsc::{channel, sync_channel, Receiver, Sender, SyncSender};
 use std::thread;
@@ -63,11 +62,13 @@ struct HashedHeader {
 
 fn hash_headers(headers: Vec<BlockHeader>) -> Vec<HashedHeader> {
     // header[i] -> header[i-1] (i.e. header.last() is the tip)
-    let hashed_headers =
-        Vec::<HashedHeader>::from_iter(headers.into_iter().map(|header| HashedHeader {
+    let hashed_headers: Vec<HashedHeader> = headers
+        .into_iter()
+        .map(|header| HashedHeader {
             blockhash: header.block_hash(),
             header,
-        }));
+        })
+        .collect();
     for i in 1..hashed_headers.len() {
         assert_eq!(
             hashed_headers[i].header.prev_blockhash,
