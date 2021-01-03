@@ -56,7 +56,7 @@ unsigned-varint = "0.2.3"
 cashaccount-sys = ">=0.1"
 c_fixed_string = "0.2"
 version-compare = "0.0.10"
-bitcoincash-addr = "0.5.1"
+bitcoincash-addr = "0.5.2"
 indexmap = "1.6.0"
 rand = "0.7.3"
 rust_decimal = { version = "1.8.1", features = ["serde-float"] }

@@ -86,7 +86,7 @@ fn run_server(config: &Config) -> Result<()> {
 
     let app = App::new(store, index, daemon, &config)?;
     let tx_cache = TransactionCache::new(config.tx_cache_size as u64, &*metrics);
-    let query = Query::new(app.clone(), &*metrics, tx_cache)?;
+    let query = Query::new(app.clone(), &*metrics, tx_cache, config.network_type)?;
     let relayfee = query.get_relayfee()?;
     let connection_limits = ConnectionLimits::new(
         config.rpc_timeout,
