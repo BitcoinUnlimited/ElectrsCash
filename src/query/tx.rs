@@ -9,6 +9,7 @@ use bitcoincash::consensus::encode::{deserialize, serialize};
 use bitcoincash::hash_types::{BlockHash, Txid};
 use bitcoincash::hashes::hex::ToHex;
 use bitcoincash::network::constants::Network;
+use bitcoincash::util::address::Payload::{PubkeyHash, ScriptHash};
 use bitcoincash::util::address::{Address, AddressType};
 use rust_decimal::prelude::*;
 use serde_json::Value;
@@ -16,11 +17,11 @@ use std::sync::Arc;
 
 ///  String returned is intended to be the same as produced by bitcoind
 ///  GetTxnOutputType
-fn get_address_type(script: &Script) -> Option<&str> {
+fn get_address_type(script: &Script, network: Network) -> Option<&str> {
     if script.is_op_return() {
         return Some("nulldata");
     }
-    let address = Address::from_script(script, Network::Bitcoin)?;
+    let address = Address::from_script(script, network)?;
     let address_type = address.address_type();
     match address_type {
         Some(AddressType::P2pkh) => Some("pubkeyhash"),
@@ -32,6 +33,51 @@ fn get_address_type(script: &Script) -> Option<&str> {
                 None
             }
         }
+    }
+}
+
+fn get_addresses(script: &Script, network: Network) -> Vec<String> {
+    let address = match Address::from_script(script, network) {
+        Some(a) => a,
+        None => return vec![],
+    };
+
+    let cashaddr_network = match network {
+        Network::Bitcoin => bitcoincash_addr::Network::Main,
+        Network::Testnet => bitcoincash_addr::Network::Test,
+        Network::Regtest => bitcoincash_addr::Network::Regtest,
+    };
+
+    match address.payload {
+        PubkeyHash(pubhash) => {
+            let hash = pubhash.as_hash().to_vec();
+            let encoded = bitcoincash_addr::Address::new(
+                hash,
+                bitcoincash_addr::Scheme::CashAddr,
+                bitcoincash_addr::HashType::Key,
+                cashaddr_network,
+            )
+            .encode();
+            match encoded {
+                Ok(addr) => vec![addr],
+                _ => vec![],
+            }
+        }
+        ScriptHash(scripthash) => {
+            let hash = scripthash.as_hash().to_vec();
+            let encoded = bitcoincash_addr::Address::new(
+                hash,
+                bitcoincash_addr::Scheme::CashAddr,
+                bitcoincash_addr::HashType::Script,
+                cashaddr_network,
+            )
+            .encode();
+            match encoded {
+                Ok(addr) => vec![addr],
+                _ => vec![],
+            }
+        }
+        _ => vec![],
     }
 }
 
@@ -50,6 +96,7 @@ pub struct TxQuery {
     daemon: Daemon,
     header: Arc<HeaderQuery>,
     duration: Arc<prometheus::HistogramVec>,
+    network: Network,
 }
 
 impl TxQuery {
@@ -58,12 +105,14 @@ impl TxQuery {
         daemon: Daemon,
         header: Arc<HeaderQuery>,
         duration: Arc<prometheus::HistogramVec>,
+        network: Network,
     ) -> TxQuery {
         TxQuery {
             tx_cache,
             daemon,
             header,
             duration,
+            network,
         }
     }
 
@@ -156,7 +205,8 @@ impl TxQuery {
                     "scriptPubKey": {
                         "asm": txout.script_pubkey.asm(),
                         "hex": txout.script_pubkey.to_hex(),
-                        "type": get_address_type(&txout.script_pubkey).unwrap_or_default(),
+                        "type": get_address_type(&txout.script_pubkey, self.network).unwrap_or_default(),
+                        "addresses": get_addresses(&txout.script_pubkey, self.network),
                     },
                     })).collect::<Vec<Value>>(),
         }))

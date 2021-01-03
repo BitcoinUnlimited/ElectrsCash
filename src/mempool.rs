@@ -1,7 +1,6 @@
 use bitcoincash::blockdata::transaction::Transaction;
 use bitcoincash::hash_types::Txid;
 use std::collections::{BTreeMap, HashMap, HashSet};
-use std::iter::FromIterator;
 use std::ops::Bound;
 use std::sync::Mutex;
 
@@ -218,7 +217,7 @@ impl Tracker {
         let new_txids = daemon
             .getmempooltxids()
             .chain_err(|| "failed to update mempool from daemon")?;
-        let old_txids = HashSet::from_iter(self.items.keys().cloned());
+        let old_txids = self.items.keys().cloned().collect();
         timer.observe_duration();
 
         let timer = self.stats.start_timer("add");

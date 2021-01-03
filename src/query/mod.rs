@@ -4,6 +4,7 @@ use bitcoincash::hash_types::{BlockHash, TxMerkleNode, Txid};
 use bitcoincash::hashes::hex::ToHex;
 use bitcoincash::hashes::sha256d::Hash as Sha256dHash;
 use bitcoincash::hashes::Hash;
+use bitcoincash::network::constants::Network;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
@@ -200,7 +201,12 @@ pub struct Query {
 }
 
 impl Query {
-    pub fn new(app: Arc<App>, metrics: &Metrics, tx_cache: TransactionCache) -> Result<Arc<Query>> {
+    pub fn new(
+        app: Arc<App>,
+        metrics: &Metrics,
+        tx_cache: TransactionCache,
+        network: Network,
+    ) -> Result<Arc<Query>> {
         let daemon = app.daemon().reconnect()?;
         let duration = Arc::new(metrics.histogram_vec(
             prometheus::HistogramOpts::new(
@@ -215,6 +221,7 @@ impl Query {
             daemon,
             header.clone(),
             duration.clone(),
+            network,
         ));
         let confirmed = ConfirmedQuery::new(tx.clone(), duration.clone());
         let unconfirmed = UnconfirmedQuery::new(tx.clone(), duration.clone());

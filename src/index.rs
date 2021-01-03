@@ -4,7 +4,6 @@ use bitcoincash::consensus::encode::{deserialize, serialize};
 use bitcoincash::hash_types::{BlockHash, Txid};
 use bitcoincash::hashes::Hash;
 use std::collections::{HashMap, HashSet};
-use std::iter::FromIterator;
 use std::sync::RwLock;
 
 use crate::cashaccount::CashAccountParser;
@@ -416,9 +415,10 @@ impl Index {
         if let Some(latest_header) = new_headers.last() {
             info!("{:?} ({} left to index)", latest_header, new_headers.len());
         };
-        let height_map = HashMap::<BlockHash, usize>::from_iter(
-            new_headers.iter().map(|h| (*h.hash(), h.height())),
-        );
+        let height_map: HashMap<BlockHash, usize> = new_headers
+            .iter()
+            .map(|h| (*h.hash(), h.height()))
+            .collect();
 
         let chan = SyncChannel::new(self.batch_size);
         let sender = chan.sender();
