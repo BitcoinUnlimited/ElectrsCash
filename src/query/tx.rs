@@ -149,34 +149,34 @@ impl TxQuery {
     }
 
     pub fn get_verbose(&self, txid: &Txid) -> Result<Value> {
-        let header = self.header.get_by_txid(&txid, None)?;
+        let header = self.header.get_by_txid(&txid, None).unwrap_or_default();
         let blocktime = match header {
-            Some(ref header) => header.header().time,
-            None => 0,
+            Some(ref header) => Some(header.header().time),
+            None => None,
         };
         let height = match header {
-            Some(ref header) => header.height(),
-            None => 0,
+            Some(ref header) => Some(header.height()),
+            None => None,
         };
         let confirmations = match header {
             Some(ref header) => {
                 if let Some(best) = self.header.best() {
-                    best.height() - header.height()
+                    Some(best.height() - header.height())
                 } else {
-                    0
+                    None
                 }
             }
-            None => 0,
+            None => None,
         };
-        let blockhash = if let Some(h) = header {
-            Some(*h.hash())
+        let (blockhash, blockhash_hex) = if let Some(h) = header {
+            (Some(*h.hash()), Some(h.hash().to_hex()))
         } else {
-            None
+            (None, None)
         };
         let tx = self.get(txid, blockhash.as_ref(), None)?;
         let tx_serialized = serialize(&tx);
         Ok(json!({
-            "blockhash": blockhash.unwrap_or_default().to_hex(),
+            "blockhash": blockhash_hex,
             "blocktime": blocktime,
             "height": height,
             "confirmations": confirmations,
