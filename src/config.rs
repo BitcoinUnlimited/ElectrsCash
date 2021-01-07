@@ -203,6 +203,8 @@ impl Config {
             Network::Bitcoin => "mainnet",
             Network::Testnet => "testnet",
             Network::Regtest => "regtest",
+            Network::Testnet4 => "testnet4",
+            Network::Scalenet => "scalenet",
         };
 
         config.db_dir.push(db_subdir);
@@ -211,22 +213,30 @@ impl Config {
             Network::Bitcoin => 8332,
             Network::Testnet => 18332,
             Network::Regtest => 18443,
+            Network::Testnet4 => 28332,
+            Network::Scalenet => 38332,
         };
         let default_electrum_port = match config.network {
             Network::Bitcoin => 50001,
             Network::Testnet => 60001,
             Network::Regtest => 60401,
+            Network::Testnet4 => 62001,
+            Network::Scalenet => 63001,
         };
         let default_monitoring_port = match config.network {
             Network::Bitcoin => 4224,
             Network::Testnet => 14224,
             Network::Regtest => 24224,
+            Network::Testnet4 => 34224,
+            Network::Scalenet => 44224,
         };
 
         let default_ws_port = match config.network {
             Network::Bitcoin => 50003,
             Network::Testnet => 60003,
             Network::Regtest => 60403,
+            Network::Testnet4 => 62003,
+            Network::Scalenet => 63003,
         };
 
         let daemon_rpc_addr: SocketAddr = config.daemon_rpc_addr.map_or(
@@ -250,6 +260,8 @@ impl Config {
             Network::Bitcoin => (),
             Network::Testnet => config.daemon_dir.push("testnet3"),
             Network::Regtest => config.daemon_dir.push("regtest"),
+            Network::Testnet4 => config.daemon_dir.push("testnet4"),
+            Network::Scalenet => config.daemon_dir.push("scalenet"),
         }
 
         let daemon_dir = &config.daemon_dir;

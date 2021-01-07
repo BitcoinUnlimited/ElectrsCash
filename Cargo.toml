@@ -22,7 +22,7 @@ default = ["rocksdb/snappy", "rocksdb/lz4", "rocksdb/zstd", "rocksdb/zlib", "roc
 async-std = "1.7.0"
 base64 = "0.10"
 bincode = "1.0"
-bitcoincash = { version = "0.23", features = ["use-serde"] }
+bitcoincash = { version = "0.25", features = ["use-serde"] }
 bytecodec = "0.4.13"
 byteorder = "1"
 configure_me = "0.3.4"

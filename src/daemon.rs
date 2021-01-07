@@ -391,8 +391,8 @@ impl Daemon {
         Ok(paths)
     }
 
-    pub fn magic(&self) -> u32 {
-        self.network.magic()
+    pub fn disk_magic(&self) -> u32 {
+        self.network.disk_magic()
     }
 
     fn call_jsonrpc(&self, method: &str, request: &Value) -> Result<Value> {
