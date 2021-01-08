@@ -161,7 +161,7 @@ impl TxQuery {
         let confirmations = match header {
             Some(ref header) => {
                 if let Some(best) = self.header.best() {
-                    Some(best.height() - header.height())
+                    Some(1 + best.height() - header.height())
                 } else {
                     None
                 }
