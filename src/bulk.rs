@@ -39,7 +39,7 @@ impl Parser {
         cashaccount_activation_height: u32,
     ) -> Result<Arc<Parser>> {
         Ok(Arc::new(Parser {
-            magic: daemon.magic(),
+            magic: daemon.disk_magic(),
             current_headers: load_headers(daemon)?,
             indexed_blockhashes: Mutex::new(indexed_blockhashes),
             cashaccount_activation_height,

@@ -46,6 +46,8 @@ fn get_addresses(script: &Script, network: Network) -> Vec<String> {
         Network::Bitcoin => bitcoincash_addr::Network::Main,
         Network::Testnet => bitcoincash_addr::Network::Test,
         Network::Regtest => bitcoincash_addr::Network::Regtest,
+        Network::Testnet4 => bitcoincash_addr::Network::Test,
+        Network::Scalenet => bitcoincash_addr::Network::Test,
     };
 
     match address.payload {
