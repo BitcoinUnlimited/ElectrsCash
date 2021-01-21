@@ -1,5 +1,119 @@
 # Release notes
 
+## 3.0.0 (21 January 2021)
+
+### Relase notes
+
+This version completes implementation of
+[Protocol version 1.4.3](https://bitcoincash.network/electrum/). In addition
+a custom call [`blockchain.transcation.get_confirmed_blockhash`](doc/rpc.md)
+has been added to utilize the transaction index. This can replace bitcoind
+txindex for those who want to optimize disk space.
+
+WebSocket support has been added. As part of testing it, it has been used to
+power the
+[flipstarter overview site](https://flipstarters.bitcoincash.network/) and
+[receipt generator](https://receipt.bitcoincash.network/) applications.
+
+Support for Scalenet and Testnet4 has been added.
+
+A bunch new metrics have been added, including [rpc
+connections](https://bit.ly/3o5ADf4), [memory usage](https://bit.ly/2LI29m1)
+and [cache churn](https://bit.ly/35ZGLiK) + more. See
+[stats.bitcoincash.network](https://stats.bitcoincash.network) for demo with
+all metrics.
+
+The `blockchain.transcation.get` got a full overhaul and test coverage. It now
+supports all fields as bitcoind. It is **more** consistent than bitcoind, as
+every implementation (BU, BCHN, ...) has its quirks and in addition remove/add
+fields depending on various transaction properties, such as if it's coinbase,
+unconfirmed etc. ElectrsCash never removes or adds a field.
+
+This is a major version release, which implies breaking changes. Please see
+below.
+
+### Changes
+
+* [bug] Fix compatibility with Bitcoin ABC (#93)
+* [bug] Fix issue "fee must be in decreasing order" (#98)
+* [dos] Add RPC connection limit (#113)
+* [dos] Limit connections by IP prefix (#114)
+* [dos] Add scripthash subscription limit (#107)
+* [maintainance] Bump crate dependencies and replace abandoned crates (#118)
+* [maintainance] Remove batch fetching of unconfirmed transactions (#117)
+* [maintainance] Remove use of `mut self` in rpc blockchain (#122)
+* [maintainance] Replace use of `bitcoin_hashes` crate with `bitcoincash` (#97)
+* [maintainance] Split out responsibility of Query (#116)
+* [maintainance] Use prometheus imports (#100)
+* [metrics] Add metric `electrscash_process_jemalloc_allocated` (#104)
+* [metrics] Add metric `electrscash_process_jemalloc_resident` (#104)
+* [metrics] Add metric `electrscash_rockdb_mem_readers_total` (#103)
+* [metrics] Add metric `electrscash_rockdb_mem_table_total` (#103)
+* [metrics] Add metric `electrscash_rockdb_mem_table_unflushed` (#103)
+* [metrics] Add metric `electrscash_rpc_connections_rejeced_global` (#125)
+* [metrics] Add metric `electrscash_rpc_connections_rejeced_prefix` (#125)
+* [metrics] Add metric `electrscash_rpc_connections_total` (#125)
+* [metrics] Add metric `electrscash_rpc_connections` (#125)
+* [misc] Add WebSocket support (#109)
+* [misc] Add testnet4 and scalenet support (#130)
+* [misc] Remove --txid-limit (#106)
+* [misc] Support more argument datatypes in python cli (#95)
+* [misc] Update confiration defaults (#124)
+* [misc] Use random eviction cache (#101)
+* [performance] Change semantics of index-batch-size (#121)
+* [performance] Store statushashes as FullHash (#105)
+* [performance] Use generators with `load_txns_by_prefix` (#126)
+* [performance] Use parallel iter for finding inputs/outputs (#127)
+* [rpc] Add RPC `blockchain.address.get_mempool` (#120)
+* [rpc] Add RPC `blockchain.address.subscribe` and `blockchain.address.unsubscribe`. (#108)
+* [rpc] Add RPC `blockchain.scripthash.get_mempool` (#120)
+* [rpc] Add RPC `blockchain.transaction.get_confirmed_blockhash` (#96)
+* [rpc] Improve likeness with bitcoind getrawtransaction (#119, #128, #129)
+* [rpc] Make height optional in `transaction.get_merkle` (#111)
+
+### Breaking changes
+
+#### Default listening interface
+
+The default listening interfaces for the RPC has been changed from localhost to
+all interfaces. The WebSocket interface also listens on all interfaces.
+
+This projects goal is to be a high performant public Electrum server. Unlike
+this projects predecessor, which aims to be a private server on your local
+machine.
+
+#### Parameter `--txid-limit` removed
+
+The `--txid-limit` DoS parameter is removed. Please use `--rpc-timeout`
+parameter instead for more accurate DoS limit.
+
+For backward compatibility with existing configurations, this argument still
+exists but now does nothing. It will be completely removed in next major
+version of ElectrsCash.
+
+#### Changes in `blockchain.transaction.get` verbose output
+
+**tldr;** The `value` field in the `vout` entries of verbose transaction output is
+replaced with `value_satoshis` and `value_coins`. It used to be in satoshis.
+
+The `value` field will be reintroduced in later version of ElectrsCash
+in unit coins rather than satoshis (satoshis / 100 000 000).
+
+**Details:** The verbose output of `blockchain.transaction.get` is implemented
+in ElectrsCash, rather than forwarded to the bitcoind node as stated in the
+specification. This is a massive performance increase, as the transaction is
+often in the local cache.
+
+It was discovered that the `value` of `vout` entries were in satoshis, compared
+to bitcoind where it is in coins (satoshis / 100 000 000). While satoshis is
+more consistent with the rest of the electrum specification, it is incorrect
+as the specification for this RPC call is to output "whatever bitcoind outputs".
+
+Rather than simply changing the unit of the field at the risk of software that
+we don't know of using this field silently failing, it has been temporarily
+removed to allow such software to properly fail and corrected. The `value`
+field will be re-added in a later version of ElectrsCash.
+
 ## 2.0.0 (21 August 2020)
 * [bug] Fix deadlock on Ctrl+C (#89)
 * [bug] Update subscription statistics correctly (#89)

@@ -37,10 +37,10 @@ thus preserving the privacy of the user's addresses and balances.
 - Uses a single [RocksDB](https://github.com/spacejam/rust-rocksdb) database
   for better consistency and crash recovery.
 
-- Notable features unique to ElectrsCash
+### Notable features unique to ElectrsCash
 
 - Has [really good integration with Bitcoin Unlimited](https://github.com/BitcoinUnlimited/BitcoinUnlimited/blob/release/doc/bu-electrum-integration.md).
-- Supports all Bitcoin Cash full nodes that havfe basic `bitcoind` RPC support.
+- Supports all Bitcoin Cash full nodes that have basic `bitcoind` RPC support.
 - The best integration test coverage of all electrum server implementations.
   (see Tests section)
 - [CashAccount support](https://honest.cash/v2/dagur/fast-cashaccount-lookups-using-bitbox-and-electrum-4781)
