@@ -14,7 +14,10 @@ use std::time::Duration;
 use crate::daemon::CookieGetter;
 use crate::errors::*;
 
-const DEFAULT_SERVER_ADDRESS: [u8; 4] = [127, 0, 0, 1]; // by default, serve on IPv4 localhost
+// by default, serve on all IPv4 interfaces
+const DEFAULT_BIND_ADDRESS: [u8; 4] = [0, 0, 0, 0];
+const MONITOR_BIND_ADDRESS: [u8; 4] = [127, 0, 0, 1];
+const DEFAULT_SERVER_ADDRESS: [u8; 4] = [127, 0, 0, 1];
 
 mod internal {
     #![allow(unused)]
@@ -244,15 +247,15 @@ impl Config {
             ResolvAddr::resolve_or_exit,
         );
         let electrum_rpc_addr: SocketAddr = config.electrum_rpc_addr.map_or(
-            (DEFAULT_SERVER_ADDRESS, default_electrum_port).into(),
+            (DEFAULT_BIND_ADDRESS, default_electrum_port).into(),
             ResolvAddr::resolve_or_exit,
         );
         let electrum_ws_addr: SocketAddr = config.electrum_ws_addr.map_or(
-            (DEFAULT_SERVER_ADDRESS, default_ws_port).into(),
+            (DEFAULT_BIND_ADDRESS, default_ws_port).into(),
             ResolvAddr::resolve_or_exit,
         );
         let monitoring_addr: SocketAddr = config.monitoring_addr.map_or(
-            (DEFAULT_SERVER_ADDRESS, default_monitoring_port).into(),
+            (MONITOR_BIND_ADDRESS, default_monitoring_port).into(),
             ResolvAddr::resolve_or_exit,
         );
 
