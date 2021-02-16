@@ -376,7 +376,10 @@ impl RPC {
                 stream
                     .set_nonblocking(false)
                     .expect("failed to set connection as blocking");
-                acceptor.send(Some((stream, addr))).expect("send failed");
+                match acceptor.send(Some((stream, addr))) {
+                    Ok(_) => {}
+                    Err(e) => trace!("Failed to send to client {:?}", e),
+                }
             }
         });
         chan
