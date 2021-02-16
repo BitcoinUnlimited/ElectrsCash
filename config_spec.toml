@@ -3,13 +3,12 @@ env_prefix = "ELECTRSCASH"
 conf_file_param = "conf"
 conf_dir_param = "conf_dir"
 doc = """
-An efficient implementation of Electrum Server for Bitcoin Cash.
+ElectrsCash is an efficient implementation of Electrum Server and can be used
+as a drop-in replacement for ElectrumX. In addition to the TCP RPC interface,
+it also provides WebSocket support.
 
-The motivation behind this project is to improve the Bitcoin Cash infrastructure
-for lightweight clients, providing them with efficient backend services.
-
-ElectrsCash extends the original Electrum protocol, supporting additional
-technology well established in the ecosystem such as CashAccounts.
+ElectrsCash fully implements the version 1.4.3 of the Electrum Cash protocol
+and in addition to useful extensions, including CashAccounts.
 
 The server indexes the entire Bitcoin Cash blockchain, and the resulting index
 enables fast queries for blockchain applications and any given user wallet,
