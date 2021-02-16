@@ -74,8 +74,8 @@ impl Connection {
         }
     }
 
-    fn mempool_get_fee_histogram(&self) -> Result<Value> {
-        Ok(json!(self.query.get_fee_histogram()))
+    fn mempool_get_fee_histogram(&self) -> Value {
+        json!(self.query.get_fee_histogram())
     }
 
     fn cashaccount_query_name(&self, params: &[Value]) -> Result<Value> {
@@ -86,7 +86,7 @@ impl Connection {
         self.query.get_cashaccount_txs(name, height as u32)
     }
 
-    fn handle_command(&mut self, method: &str, params: &[Value], id: &Value) -> Result<Value> {
+    fn handle_command(&mut self, method: &str, params: &[Value], id: &Value) -> Value {
         let timer = self
             .stats
             .latency
@@ -151,7 +151,7 @@ impl Connection {
             "blockchain.transaction.id_from_pos" => {
                 self.blockchainrpc.transaction_id_from_pos(&params)
             }
-            "mempool.get_fee_histogram" => self.mempool_get_fee_histogram(),
+            "mempool.get_fee_histogram" => Ok(self.mempool_get_fee_histogram()),
             "server.add_peer" => server_add_peer(),
             "server.banner" => server_banner(&self.query),
             "server.donation_address" => server_donation_address(),
@@ -168,7 +168,7 @@ impl Connection {
         };
         timer.observe_duration();
         // TODO: return application errors should be sent to the client
-        Ok(if let Err(e) = result {
+        if let Err(e) = result {
             match *e.kind() {
                 ErrorKind::RpcError(ref code, _) => {
                     // Use (at most) two errors from the error chain to produce
@@ -201,7 +201,7 @@ impl Connection {
             }
         } else {
             json!({"jsonrpc": "2.0", "id": id, "result": result.unwrap() })
-        })
+        }
     }
 
     pub fn send_values(&mut self, values: &[Value]) -> Result<()> {
@@ -232,7 +232,7 @@ impl Connection {
                             Some(&Value::String(ref method)),
                             &Value::Array(ref params),
                             Some(ref id),
-                        ) => self.handle_command(method, params, id)?,
+                        ) => self.handle_command(method, params, id),
                         _ => bail!("invalid command: {}", cmd),
                     };
                     self.send_values(&[reply])?
