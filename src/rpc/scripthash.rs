@@ -2,7 +2,7 @@ use crate::errors::*;
 use crate::mempool::MEMPOOL_HEIGHT;
 use crate::query::primitives::FundingOutput;
 use crate::query::{Query, Status};
-use crate::scripthash::{FullHash, ToLEHex};
+use crate::scripthash::{FullHash, ToLeHex};
 use crate::timeout::TimeoutTrigger;
 use bitcoincash::hash_types::BlockHash;
 use bitcoincash::hashes::hex::ToHex;

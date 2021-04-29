@@ -9,7 +9,7 @@ use serde_json::{from_str, from_value, Map, Value};
 use std::collections::{HashMap, HashSet};
 use std::io::{BufRead, BufReader, Lines, Write};
 use std::net::{SocketAddr, TcpStream};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -21,12 +21,12 @@ use crate::signal::Waiter;
 use crate::util::HeaderList;
 
 fn parse_hash<T: Hash>(value: &Value) -> Result<T> {
-    Ok(T::from_hex(
+    T::from_hex(
         value
             .as_str()
             .chain_err(|| format!("non-string value: {}", value))?,
     )
-    .chain_err(|| format!("non-hex value: {}", value))?)
+    .chain_err(|| format!("non-hex value: {}", value))
 }
 
 fn header_from_value(value: Value) -> Result<BlockHeader> {
@@ -34,22 +34,19 @@ fn header_from_value(value: Value) -> Result<BlockHeader> {
         .as_str()
         .chain_err(|| format!("non-string header: {}", value))?;
     let header_bytes = hex::decode(header_hex).chain_err(|| "non-hex header")?;
-    Ok(
-        deserialize(&header_bytes)
-            .chain_err(|| format!("failed to parse header {}", header_hex))?,
-    )
+    deserialize(&header_bytes).chain_err(|| format!("failed to parse header {}", header_hex))
 }
 
 fn block_from_value(value: Value) -> Result<Block> {
     let block_hex = value.as_str().chain_err(|| "non-string block")?;
     let block_bytes = hex::decode(block_hex).chain_err(|| "non-hex block")?;
-    Ok(deserialize(&block_bytes).chain_err(|| format!("failed to parse block {}", block_hex))?)
+    deserialize(&block_bytes).chain_err(|| format!("failed to parse block {}", block_hex))
 }
 
 fn tx_from_value(value: Value) -> Result<Transaction> {
     let tx_hex = value.as_str().chain_err(|| "non-string tx")?;
     let tx_bytes = hex::decode(tx_hex).chain_err(|| "non-hex tx")?;
-    Ok(deserialize(&tx_bytes).chain_err(|| format!("failed to parse tx {}", tx_hex))?)
+    deserialize(&tx_bytes).chain_err(|| format!("failed to parse tx {}", tx_hex))
 }
 
 /// Parse JSONRPC error code, if exists.
@@ -299,8 +296,8 @@ pub struct Daemon {
 impl Daemon {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        daemon_dir: &PathBuf,
-        blocks_dir: &PathBuf,
+        daemon_dir: &Path,
+        blocks_dir: &Path,
         daemon_rpc_addr: SocketAddr,
         cookie_getter: Arc<dyn CookieGetter>,
         network: Network,
@@ -309,8 +306,8 @@ impl Daemon {
         metrics: &Metrics,
     ) -> Result<Daemon> {
         let daemon = Daemon {
-            daemon_dir: daemon_dir.clone(),
-            blocks_dir: blocks_dir.clone(),
+            daemon_dir: daemon_dir.to_path_buf(),
+            blocks_dir: blocks_dir.to_path_buf(),
             network,
             conn: Mutex::new(Connection::new(
                 daemon_rpc_addr,
@@ -458,12 +455,12 @@ impl Daemon {
 
     fn getblockchaininfo(&self) -> Result<BlockchainInfo> {
         let info: Value = self.request("getblockchaininfo", json!([]))?;
-        Ok(from_value(info).chain_err(|| "invalid blockchain info")?)
+        from_value(info).chain_err(|| "invalid blockchain info")
     }
 
     fn getnetworkinfo(&self) -> Result<NetworkInfo> {
         let info: Value = self.request("getnetworkinfo", json!([]))?;
-        Ok(from_value(info).chain_err(|| "invalid network info")?)
+        from_value(info).chain_err(|| "invalid network info")
     }
 
     pub fn get_subversion(&self) -> Result<String> {
@@ -545,7 +542,7 @@ impl Daemon {
         if let Some(blockhash) = blockhash {
             args.as_array_mut().unwrap().push(json!(blockhash.to_hex()));
         }
-        Ok(self.request("getrawtransaction", args)?)
+        self.request("getrawtransaction", args)
     }
 
     pub fn getmempooltxids(&self) -> Result<HashSet<Txid>> {
@@ -577,10 +574,8 @@ impl Daemon {
     pub fn broadcast(&self, tx: &Transaction) -> Result<Txid> {
         let tx = hex::encode(serialize(tx));
         let txid = self.request("sendrawtransaction", json!([tx]))?;
-        Ok(
-            Txid::from_hex(txid.as_str().chain_err(|| "non-string txid")?)
-                .chain_err(|| "failed to parse txid")?,
-        )
+        Txid::from_hex(txid.as_str().chain_err(|| "non-string txid")?)
+            .chain_err(|| "failed to parse txid")
     }
 
     fn get_all_headers(&self, tip: &BlockHash) -> Result<Vec<BlockHeader>> {

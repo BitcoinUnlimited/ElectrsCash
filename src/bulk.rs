@@ -17,7 +17,7 @@ use crate::errors::*;
 use crate::index::{index_block, last_indexed_block, read_indexed_blockhashes};
 use crate::metrics::Metrics;
 use crate::signal::Waiter;
-use crate::store::{DBStore, Row, WriteStore};
+use crate::store::{DbStore, Row, WriteStore};
 use crate::util::{spawn_thread, HeaderList, SyncChannel};
 
 struct Parser {
@@ -233,9 +233,9 @@ pub fn index_blk_files(
     index_threads: usize,
     metrics: &Metrics,
     signal: &Waiter,
-    store: DBStore,
+    store: DbStore,
     cashaccount_activation_height: u32,
-) -> Result<DBStore> {
+) -> Result<DbStore> {
     set_open_files_limit(2048); // twice the default `ulimit -n` value
     let blk_files = daemon.list_blk_files()?;
     info!("indexing {} blk*.dat files", blk_files.len());

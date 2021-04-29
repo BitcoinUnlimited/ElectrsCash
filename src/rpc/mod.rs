@@ -15,9 +15,9 @@ use crate::doslimit::{ConnectionLimits, GlobalLimits};
 use crate::errors::*;
 use crate::metrics::Metrics;
 use crate::query::Query;
-use crate::rpc::blockchain::BlockchainRPC;
+use crate::rpc::blockchain::BlockchainRpc;
 use crate::rpc::parseutil::usize_from_value;
-use crate::rpc::rpcstats::RPCStats;
+use crate::rpc::rpcstats::RpcStats;
 use crate::rpc::server::{
     server_add_peer, server_banner, server_donation_address, server_features,
     server_peers_subscribe, server_version,
@@ -48,9 +48,9 @@ struct Connection {
     stream: TcpStream,
     addr: SocketAddr,
     sender: SyncSender<Message>,
-    stats: Arc<RPCStats>,
+    stats: Arc<RpcStats>,
     doslimits: ConnectionLimits,
-    blockchainrpc: BlockchainRPC,
+    blockchainrpc: BlockchainRpc,
 }
 
 impl Connection {
@@ -58,7 +58,7 @@ impl Connection {
         query: Arc<Query>,
         stream: TcpStream,
         addr: SocketAddr,
-        stats: Arc<RPCStats>,
+        stats: Arc<RpcStats>,
         relayfee: f64,
         doslimits: ConnectionLimits,
         sender: SyncSender<Message>,
@@ -70,7 +70,7 @@ impl Connection {
             sender,
             stats: stats.clone(),
             doslimits,
-            blockchainrpc: BlockchainRPC::new(query, stats, relayfee, doslimits),
+            blockchainrpc: BlockchainRpc::new(query, stats, relayfee, doslimits),
         }
     }
 
@@ -318,13 +318,13 @@ pub enum Notification {
     Exit,
 }
 
-pub struct RPC {
+pub struct Rpc {
     notification: Sender<Notification>,
     server: Option<thread::JoinHandle<()>>, // so we can join the server while dropping this ojbect
     query: Arc<Query>,
 }
 
-impl RPC {
+impl Rpc {
     fn start_notifier(
         notification: Channel<Notification>,
         senders: Arc<Mutex<Vec<SyncSender<Message>>>>,
@@ -393,8 +393,8 @@ impl RPC {
         connection_limits: ConnectionLimits,
         global_limits: Arc<GlobalLimits>,
         rpc_buffer_size: usize,
-    ) -> RPC {
-        let stats = Arc::new(RPCStats {
+    ) -> Rpc {
+        let stats = Arc::new(RpcStats {
             latency: metrics.histogram_vec(
                 prometheus::HistogramOpts::new("electrscash_rpc_latency", "RPC latency (seconds)"),
                 &["method"],
@@ -407,14 +407,14 @@ impl RPC {
 
         stats.subscriptions.set(0);
         let notification = Channel::unbounded();
-        RPC {
+        Rpc {
             notification: notification.sender(),
             query: query.clone(),
             server: Some(spawn_thread("rpc", move || {
                 let senders = Arc::new(Mutex::new(Vec::<SyncSender<Message>>::new()));
 
-                let acceptor = RPC::start_acceptor(addr);
-                RPC::start_notifier(notification, senders.clone(), acceptor.sender());
+                let acceptor = Rpc::start_acceptor(addr);
+                Rpc::start_notifier(notification, senders.clone(), acceptor.sender());
 
                 let mut threads = HashMap::new();
                 let (garbage_sender, garbage_receiver) = crossbeam_channel::unbounded();
@@ -576,7 +576,7 @@ impl RPC {
     }
 }
 
-impl Drop for RPC {
+impl Drop for Rpc {
     fn drop(&mut self) {
         trace!("stop accepting new RPCs");
         self.notification.send(Notification::Exit).unwrap();

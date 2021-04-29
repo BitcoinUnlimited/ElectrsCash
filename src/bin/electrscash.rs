@@ -19,9 +19,9 @@ use electrscash::{
     index::Index,
     metrics::Metrics,
     query::Query,
-    rpc::RPC,
+    rpc::Rpc,
     signal::Waiter,
-    store::{full_compaction, is_compatible_version, is_fully_compacted, DBStore},
+    store::{full_compaction, is_compatible_version, is_fully_compacted, DbStore},
 };
 
 fn run_server(config: &Config) -> Result<()> {
@@ -45,15 +45,15 @@ fn run_server(config: &Config) -> Result<()> {
     )?);
     // Perform initial indexing.
     let compatible = {
-        let store = DBStore::open(&config.db_path, config.low_memory, &*metrics);
+        let store = DbStore::open(&config.db_path, config.low_memory, &*metrics);
         is_compatible_version(&store)
     };
 
     if !compatible {
         info!("Incompatible database. Running full reindex.");
-        DBStore::destroy(&config.db_path);
+        DbStore::destroy(&config.db_path);
     }
-    let store = DBStore::open(&config.db_path, config.low_memory, &*metrics);
+    let store = DbStore::open(&config.db_path, config.low_memory, &*metrics);
     let index = Index::load(
         &store,
         &daemon,
@@ -99,7 +99,7 @@ fn run_server(config: &Config) -> Result<()> {
         &*metrics,
     ));
 
-    let mut server: Option<RPC> = None; // Electrum RPC server
+    let mut server: Option<Rpc> = None; // Electrum RPC server
 
     let rpc_addr = config.electrum_rpc_addr;
     let ws_addr = config.electrum_ws_addr;
@@ -119,7 +119,7 @@ fn run_server(config: &Config) -> Result<()> {
                 }
                 Some(rpc)
             }
-            None => Some(RPC::start(
+            None => Some(Rpc::start(
                 config.electrum_rpc_addr,
                 query.clone(),
                 metrics.clone(),
