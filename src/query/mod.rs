@@ -333,7 +333,7 @@ impl Query {
 
     pub fn get_best_header(&self) -> Result<HeaderEntry> {
         let last_header = self.app.index().best_header();
-        Ok(last_header.chain_err(|| "no headers indexed")?)
+        last_header.chain_err(|| "no headers indexed")
     }
 
     pub fn getblocktxids(&self, blockhash: &BlockHash) -> Result<Vec<Txid>> {
@@ -476,7 +476,7 @@ impl Query {
             tx: String,
             height: u32,
             blockhash: String,
-        };
+        }
         let header = self
             .header()
             .at_height(height as usize)

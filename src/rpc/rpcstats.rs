@@ -1,6 +1,6 @@
 use prometheus::{HistogramVec, IntGauge};
 
-pub struct RPCStats {
+pub struct RpcStats {
     pub latency: HistogramVec,
     pub subscriptions: IntGauge,
 }

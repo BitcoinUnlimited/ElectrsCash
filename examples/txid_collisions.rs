@@ -3,9 +3,9 @@ extern crate electrscash;
 extern crate hex;
 extern crate log;
 
-use electrscash::{config::Config, metrics::Metrics, store::DBStore};
+use electrscash::{config::Config, metrics::Metrics, store::DbStore};
 
-fn max_collision(store: DBStore, prefix: &[u8]) {
+fn max_collision(store: DbStore, prefix: &[u8]) {
     let prefix_len = prefix.len();
     let mut prev: Option<Vec<u8>> = None;
     let mut collision_max = 0;
@@ -45,7 +45,7 @@ fn run(config: Config) {
     let metrics = Metrics::new(config.monitoring_addr);
     metrics.start();
 
-    let store = DBStore::open(&config.db_path, /*low_memory=*/ false, &metrics);
+    let store = DbStore::open(&config.db_path, /*low_memory=*/ false, &metrics);
     max_collision(store, b"T");
 }
 

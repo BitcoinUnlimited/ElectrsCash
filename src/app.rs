@@ -5,7 +5,7 @@ use crate::util::HeaderEntry;
 use crate::{config::Config, daemon, errors::*, index, signal::Waiter, store};
 
 pub struct App {
-    store: store::DBStore,
+    store: store::DbStore,
     index: index::Index,
     daemon: daemon::Daemon,
     banner: String,
@@ -14,7 +14,7 @@ pub struct App {
 
 impl App {
     pub fn new(
-        store: store::DBStore,
+        store: store::DbStore,
         index: index::Index,
         daemon: Arc<daemon::Daemon>,
         config: &Config,

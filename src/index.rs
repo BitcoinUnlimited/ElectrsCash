@@ -85,7 +85,7 @@ fn encode_varint(value: u64) -> Vec<u8> {
 }
 
 fn decode_varint(index: &[u8]) -> u64 {
-    unsigned_varint::decode::u64(&index[..]).unwrap().0
+    unsigned_varint::decode::u64(index).unwrap().0
 }
 
 impl TxOutRow {

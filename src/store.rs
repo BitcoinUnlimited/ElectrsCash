@@ -41,14 +41,14 @@ struct Options {
     low_memory: bool,
 }
 
-pub struct DBStore {
+pub struct DbStore {
     db: Arc<rocksdb::DB>,
     opts: Options,
     stats_thread: Option<thread::JoinHandle<()>>,
     stats_thread_kill: Arc<(Mutex<bool>, Condvar)>,
 }
 
-impl DBStore {
+impl DbStore {
     fn open_opts(opts: Options, metrics: &Metrics) -> Self {
         debug!("opening DB at {:?}", opts.path);
         let mut db_opts = rocksdb::Options::default();
@@ -70,7 +70,7 @@ impl DBStore {
         let mut block_opts = rocksdb::BlockBasedOptions::default();
         block_opts.set_block_size(if opts.low_memory { 256 << 10 } else { 1 << 20 });
         #[allow(clippy::mutex_atomic)]
-        let mut store = DBStore {
+        let mut store = DbStore {
             db: Arc::new(rocksdb::DB::open(&db_opts, &opts.path).unwrap()),
             opts,
             stats_thread: None,
@@ -131,7 +131,7 @@ impl DBStore {
 
     /// Opens a new RocksDB at the specified location.
     pub fn open(path: &Path, low_memory: bool, metrics: &Metrics) -> Self {
-        DBStore::open_opts(
+        DbStore::open_opts(
             Options {
                 path: path.to_path_buf(),
                 bulk_import: true,
@@ -200,7 +200,7 @@ impl<'a> Iterator for ScanIterator<'a> {
     }
 }
 
-impl ReadStore for DBStore {
+impl ReadStore for DbStore {
     fn get(&self, key: &[u8]) -> Option<Bytes> {
         self.db.get(key).unwrap().map(|v| v.to_vec())
     }
@@ -224,7 +224,7 @@ impl ReadStore for DBStore {
     }
 }
 
-impl WriteStore for DBStore {
+impl WriteStore for DbStore {
     fn write<I: IntoIterator<Item = Row>>(&self, rows: I, sync: bool) {
         let mut batch = rocksdb::WriteBatch::default();
         for row in rows {
@@ -245,7 +245,7 @@ impl WriteStore for DBStore {
     }
 }
 
-impl Drop for DBStore {
+impl Drop for DbStore {
     fn drop(&mut self) {
         trace!("closing DB at {:?}", self.opts.path);
 
@@ -284,7 +284,7 @@ pub fn is_compatible_version(store: &dyn ReadStore) -> bool {
     }
 }
 
-pub fn full_compaction(store: DBStore) -> DBStore {
+pub fn full_compaction(store: DbStore) -> DbStore {
     store.flush();
     let store = store.compact().enable_compaction();
     store.write(vec![full_compaction_marker()], true);

@@ -117,9 +117,9 @@ impl ::configure_me::parse_arg::ParseArgFromStr for BitcoinNetwork {
     }
 }
 
-impl Into<Network> for BitcoinNetwork {
-    fn into(self) -> Network {
-        self.0
+impl From<BitcoinNetwork> for Network {
+    fn from(s: BitcoinNetwork) -> Network {
+        s.0
     }
 }
 

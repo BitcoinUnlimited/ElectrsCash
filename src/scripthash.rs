@@ -9,11 +9,11 @@ use crate::errors::*;
 const HASH_LEN: usize = 32;
 pub type FullHash = [u8; HASH_LEN];
 
-pub trait ToLEHex {
+pub trait ToLeHex {
     fn to_le_hex(&self) -> String;
 }
 
-impl ToLEHex for FullHash {
+impl ToLeHex for FullHash {
     fn to_le_hex(&self) -> String {
         let mut h = *self;
         h.reverse();

@@ -5,10 +5,10 @@ use crate::rpc::parseutil::{
     bool_from_value_or, hash_from_value, rpc_arg_error, scripthash_from_value, str_from_value,
     usize_from_value, usize_from_value_or,
 };
-use crate::rpc::rpcstats::RPCStats;
+use crate::rpc::rpcstats::RpcStats;
 use crate::rpc::scripthash::{get_balance, get_first_use, get_history, get_mempool, listunspent};
 use crate::scripthash::addr_to_scripthash;
-use crate::scripthash::{FullHash, ToLEHex};
+use crate::scripthash::{FullHash, ToLeHex};
 use crate::timeout::TimeoutTrigger;
 use crate::util::HeaderEntry;
 use bitcoincash::blockdata::transaction::Transaction;
@@ -26,9 +26,9 @@ struct Subscription {
     alias: Option<String>,
 }
 
-pub struct BlockchainRPC {
+pub struct BlockchainRpc {
     query: Arc<Query>,
-    stats: Arc<RPCStats>,
+    stats: Arc<RpcStats>,
     subscriptions: Mutex<HashMap<FullHash /* scripthash */, Subscription>>,
     last_header_entry: Mutex<Option<HeaderEntry>>,
     relayfee: f64,
@@ -38,14 +38,14 @@ pub struct BlockchainRPC {
     alias_bytes_used: AtomicUsize,
 }
 
-impl BlockchainRPC {
+impl BlockchainRpc {
     pub fn new(
         query: Arc<Query>,
-        stats: Arc<RPCStats>,
+        stats: Arc<RpcStats>,
         relayfee: f64,
         doslimits: ConnectionLimits,
-    ) -> BlockchainRPC {
-        BlockchainRPC {
+    ) -> BlockchainRpc {
+        BlockchainRpc {
             query,
             stats,
             subscriptions: Mutex::new(HashMap::new()),
