@@ -11,8 +11,8 @@ use serde_json::Value;
 fn unspent_to_json(out: &FundingOutput) -> Value {
     json!({
         "height": if out.height == MEMPOOL_HEIGHT { 0 } else { out.height },
-        "tx_pos": out.output_index,
-        "tx_hash": out.txn_id.to_hex(),
+        "tx_pos": out.funding_output.vout,
+        "tx_hash": out.funding_output.txid.to_hex(),
         "value": out.value,
     })
 }
@@ -116,6 +116,7 @@ pub fn listunspent(
 mod tests {
     use super::*;
     use crate::mempool::ConfirmationState;
+    use bitcoincash::blockdata::transaction::OutPoint;
     use bitcoincash::hash_types::Txid;
     use bitcoincash::hashes::hex::FromHex;
     use serde_json::from_str;
@@ -130,9 +131,8 @@ mod tests {
 
     fn create_out(height: u32, txn_id: Txid) -> FundingOutput {
         FundingOutput {
-            txn_id,
+            funding_output: OutPoint::new(txn_id, 0),
             height,
-            output_index: 0,
             value: 2020,
             state: ConfirmationState::InMempool,
         }

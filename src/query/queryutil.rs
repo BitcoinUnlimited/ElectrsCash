@@ -7,6 +7,7 @@ use crate::scripthash::compute_script_hash;
 use crate::store::{ReadStore, Row};
 use crate::timeout::TimeoutTrigger;
 use crate::util::{hash_prefix, HashPrefix};
+use bitcoincash::blockdata::transaction::OutPoint;
 use bitcoincash::blockdata::transaction::Transaction;
 use bitcoincash::consensus::encode::deserialize;
 use bitcoincash::hash_types::Txid;
@@ -35,13 +36,9 @@ pub fn txoutrows_by_script_hash(store: &dyn ReadStore, script_hash: &[u8]) -> Ve
         .collect()
 }
 
-pub fn txids_by_funding_output(
-    store: &dyn ReadStore,
-    txn_id: &Txid,
-    output_index: usize,
-) -> Vec<HashPrefix> {
+pub fn txids_by_funding_output(store: &dyn ReadStore, prevout: &OutPoint) -> Vec<HashPrefix> {
     store
-        .scan(&TxInRow::filter(&txn_id, output_index))
+        .scan(&TxInRow::filter(&prevout))
         .iter()
         .map(|row| TxInRow::from_row(row).txid_prefix)
         .collect()
@@ -60,9 +57,8 @@ pub fn txoutrow_to_fundingoutput(
     let txid = txrow.get_txid();
 
     Ok(FundingOutput {
-        txn_id: txid,
+        funding_output: OutPoint::new(txid, txoutrow.get_output_index()),
         height: txrow.height,
-        output_index: txoutrow.get_output_index() as usize,
         value: txoutrow.get_output_value(),
         state: confirmation_state(mempool, &txid, txrow.height),
     })
@@ -80,17 +76,18 @@ fn lookup_tx_by_outrow(
     if txrows.len() == 1 {
         return Ok(txrows.remove(0));
     }
+    let output_index = txout.get_output_index();
     for txrow in txrows {
         timeout.check()?;
         let tx = txquery.get(&txrow.get_txid(), None, Some(txrow.height))?;
-        if txn_has_output(&tx, txout.get_output_index(), txout.key.script_hash_prefix) {
+        if txn_has_output(&tx, output_index, txout.key.script_hash_prefix) {
             return Ok(txrow);
         }
     }
     Err("tx not in store".into())
 }
 
-fn txn_has_output(txn: &Transaction, n: u64, scripthash_prefix: HashPrefix) -> bool {
+fn txn_has_output(txn: &Transaction, n: u32, scripthash_prefix: HashPrefix) -> bool {
     let n = n as usize;
     if txn.output.len() - 1 < n {
         return false;
@@ -116,7 +113,7 @@ pub fn find_spending_input(
     txquery: &TxQuery,
     timeout: &TimeoutTrigger,
 ) -> Result<Option<SpendingInput>> {
-    let spending_txns = txids_by_funding_output(store, &funding.txn_id, funding.output_index);
+    let spending_txns = txids_by_funding_output(store, &funding.funding_output);
 
     if spending_txns.len() == 1 {
         let spender_txid = &spending_txns[0];
@@ -127,7 +124,7 @@ pub fn find_spending_input(
             return Ok(Some(SpendingInput {
                 txn_id: txid,
                 height: txrows[0].height,
-                funding_output: (funding.txn_id, funding.output_index),
+                funding_output: funding.funding_output,
                 value: funding.value,
                 state: confirmation_state(mempool, &txid, txrows[0].height),
             }));
@@ -141,10 +138,7 @@ pub fn find_spending_input(
     for (height, tx) in load_txns_by_prefix(store, spending_txns, txquery) {
         let tx = tx?;
         for input in tx.input.iter() {
-            if input.previous_output.vout != funding.output_index as u32 {
-                continue;
-            }
-            if input.previous_output.txid != funding.txn_id {
+            if input.previous_output != funding.funding_output {
                 continue;
             }
             let txid = tx.txid();
@@ -152,7 +146,7 @@ pub fn find_spending_input(
             return Ok(Some(SpendingInput {
                 txn_id: txid,
                 height,
-                funding_output: (funding.txn_id, funding.output_index),
+                funding_output: funding.funding_output,
                 value: funding.value,
                 state,
             }));

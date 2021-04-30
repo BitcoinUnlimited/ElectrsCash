@@ -19,13 +19,14 @@ use crate::mempool::{ConfirmationState, Tracker};
 use crate::metrics::Metrics;
 use crate::query::confirmed::ConfirmedQuery;
 use crate::query::header::HeaderQuery;
-use crate::query::primitives::{FundingOutput, OutPoint, SpendingInput};
+use crate::query::primitives::{FundingOutput, SpendingInput};
 use crate::query::queryutil::{load_txns_by_prefix, txoutrows_by_script_hash, txrows_by_prefix};
 use crate::query::tx::TxQuery;
 use crate::query::unconfirmed::UnconfirmedQuery;
 use crate::scripthash::{compute_script_hash, FullHash};
 use crate::timeout::TimeoutTrigger;
 use crate::util::HeaderEntry;
+use bitcoincash::blockdata::transaction::OutPoint;
 
 pub mod confirmed;
 pub mod header;
@@ -91,7 +92,7 @@ impl Status {
                 ConfirmationState::UnconfirmedParent => -1,
             };
 
-            txns_map.insert(f.txn_id, height);
+            txns_map.insert(f.funding_output.txid, height);
         }
         for s in self.spending() {
             let height: i32 = match s.state {
@@ -135,9 +136,9 @@ impl Status {
     }
 
     pub fn unspent(&self) -> Vec<&FundingOutput> {
-        let mut outputs_map = HashMap::<OutPoint, &FundingOutput>::new();
+        let mut outputs_map = HashMap::<&OutPoint, &FundingOutput>::new();
         for f in self.funding() {
-            outputs_map.insert((f.txn_id, f.output_index), f);
+            outputs_map.insert(&f.funding_output, f);
         }
         for s in self.spending() {
             if outputs_map.remove(&s.funding_output).is_none() {

@@ -1,4 +1,5 @@
 use bitcoincash::blockdata::block::{Block, BlockHeader};
+use bitcoincash::blockdata::transaction::OutPoint;
 use bitcoincash::blockdata::transaction::{Transaction, TxIn, TxOut};
 use bitcoincash::consensus::encode::{deserialize, serialize};
 use bitcoincash::hash_types::{BlockHash, Txid};
@@ -43,11 +44,11 @@ impl TxInRow {
         }
     }
 
-    pub fn filter(txid: &Txid, output_index: usize) -> Bytes {
+    pub fn filter(prevout: &OutPoint) -> Bytes {
         bincode::serialize(&TxInKey {
             code: b'I',
-            prev_hash_prefix: hash_prefix(&txid[..]),
-            prev_index: encode_varint(output_index as u64),
+            prev_hash_prefix: hash_prefix(&prevout.txid[..]),
+            prev_index: encode_varint(prevout.vout as u64),
         })
         .unwrap()
     }
@@ -120,8 +121,8 @@ impl TxOutRow {
         bincode::deserialize(&row.key).expect("failed to parse TxOutRow key")
     }
 
-    pub fn get_output_index(&self) -> u64 {
-        decode_varint(&self.output_index)
+    pub fn get_output_index(&self) -> u32 {
+        decode_varint(&self.output_index) as u32
     }
 
     pub fn get_output_value(&self) -> u64 {
