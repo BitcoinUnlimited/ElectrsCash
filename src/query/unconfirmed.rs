@@ -91,7 +91,7 @@ impl UnconfirmedQuery {
         let mut txn_fees = HashMap::new();
         for mempool_txid in funding
             .iter()
-            .map(|f| f.txn_id)
+            .map(|f| f.funding_output.txid)
             .chain(spending.iter().map(|s| s.txn_id))
         {
             tracker
