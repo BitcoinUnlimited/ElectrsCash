@@ -90,6 +90,10 @@ impl Status {
                 ConfirmationState::Confirmed => f.height as i32,
                 ConfirmationState::InMempool => 0,
                 ConfirmationState::UnconfirmedParent => -1,
+                ConfirmationState::Indeterminate => {
+                    debug_assert!(false, "ConfirmationState cannot be Indeterminate");
+                    0
+                }
             };
 
             txns_map.insert(f.funding_output.txid, height);
@@ -99,6 +103,10 @@ impl Status {
                 ConfirmationState::Confirmed => s.height as i32,
                 ConfirmationState::InMempool => 0,
                 ConfirmationState::UnconfirmedParent => -1,
+                ConfirmationState::Indeterminate => {
+                    debug_assert!(false, "ConfirmationState cannot be Indeterminate");
+                    0
+                }
             };
             txns_map.insert(s.txn_id, height as i32);
         }
