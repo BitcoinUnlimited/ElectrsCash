@@ -63,6 +63,8 @@ fn check_error_code(reply_obj: &Map<String, Value>, method: &str) -> Result<()> 
             match code {
                 // RPC_IN_WARMUP -> retry by later reconnection
                 -28 => bail!(ErrorKind::Connection(err.to_string())),
+                // RPC_INVALID_ADDRESS_OR_KEY
+                -5 => bail!(rpc_invalid_params(err.to_string())),
                 _ => bail!("{} RPC error: {}", method, err),
             }
         }
