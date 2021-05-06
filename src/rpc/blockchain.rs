@@ -8,9 +8,10 @@ use crate::rpc::parseutil::{
 use crate::rpc::rpcstats::RpcStats;
 use crate::rpc::scripthash::{get_balance, get_first_use, get_history, get_mempool, listunspent};
 use crate::scripthash::addr_to_scripthash;
-use crate::scripthash::{FullHash, ToLeHex};
+use crate::scripthash::{compute_script_hash, FullHash, ToLeHex};
 use crate::timeout::TimeoutTrigger;
 use crate::util::HeaderEntry;
+use bitcoincash::blockdata::transaction::OutPoint;
 use bitcoincash::blockdata::transaction::Transaction;
 use bitcoincash::consensus::encode::{deserialize, serialize};
 use bitcoincash::hash_types::Txid;
@@ -346,6 +347,71 @@ impl BlockchainRpc {
         Ok(json!({
             "tx_hash" : txid.to_hex(),
             "merkle" : merkle_vec}))
+    }
+
+    pub fn utxo_get(&self, params: &[Value], timeout: &TimeoutTrigger) -> Result<Value> {
+        let txid = hash_from_value::<Txid>(params.get(0))?;
+        let out_n = usize_from_value(params.get(1), "out_n")?;
+        if out_n > u32::MAX as usize {
+            return Err(rpc_arg_error(&format!(
+                "Too large value for out_n parameter ({} > {})",
+                out_n,
+                u32::MAX
+            ))
+            .into());
+        }
+
+        // We want to provide the utxo amount regardless of if it's spent or
+        // unspent.
+        let utxo_creation_tx = self.query.tx().get(&txid, None, None)?;
+        timeout.check()?;
+
+        let utxo = match utxo_creation_tx.output.get(out_n) {
+            Some(utxo) => utxo,
+            None => {
+                bail!(rpc_invalid_params(format!(
+                    "out_n {} does not exist on tx {}, the transaction has {} outputs",
+                    out_n,
+                    txid.to_string(),
+                    utxo_creation_tx.output.len()
+                )));
+            }
+        };
+
+        // Fetch the spending transaction (if the utxo is spent).
+        let spend = self
+            .query
+            .get_tx_spending_prevout(&OutPoint::new(txid, out_n as u32), timeout)?;
+
+        let status = if spend.is_some() { "spent" } else { "unspent" };
+
+        let spent_json = match spend {
+            Some((tx, input_index, height)) => {
+                json!({
+                    "tx_hash": Some(tx.txid().to_string()),
+                    "tx_pos": Some(input_index),
+                    "height": Some(height),
+                })
+            }
+            None => {
+                json!({
+                    "tx_hash": None::<String>,
+                    "tx_pos": None::<u32>,
+                    "height": None::<i64>,
+                })
+            }
+        };
+
+        let utxo_confirmation_height = self.query.tx().get_confirmation_height(&txid);
+        let utxo_scripthash = compute_script_hash(&utxo.script_pubkey[..]);
+
+        Ok(json!({
+            "status": status,
+            "amount": utxo.value,
+            "scripthash": utxo_scripthash.to_le_hex(),
+            "height": utxo_confirmation_height,
+            "spent": spent_json,
+        }))
     }
 
     pub fn on_chaintip_change(&self, chaintip: HeaderEntry) -> Result<Option<Value>> {

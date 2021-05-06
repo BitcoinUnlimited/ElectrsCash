@@ -18,6 +18,7 @@ const VSIZE_BIN_WIDTH: u32 = 100_000; // in vbytes
 pub const MEMPOOL_HEIGHT: u32 = 0x7FFF_FFFF;
 
 pub enum ConfirmationState {
+    Indeterminate,
     Confirmed,
     InMempool,
     UnconfirmedParent,
@@ -260,9 +261,11 @@ impl Tracker {
         Ok(changed_txs)
     }
 
-    pub fn tx_confirmation_state(&self, txid: &Txid, height: u32) -> ConfirmationState {
-        if height != MEMPOOL_HEIGHT {
-            return ConfirmationState::Confirmed;
+    pub fn tx_confirmation_state(&self, txid: &Txid, height: Option<u32>) -> ConfirmationState {
+        if let Some(height) = height {
+            if height != MEMPOOL_HEIGHT {
+                return ConfirmationState::Confirmed;
+            }
         }
 
         // Check if any of our inputs are unconfirmed
@@ -273,10 +276,11 @@ impl Tracker {
                     return ConfirmationState::UnconfirmedParent;
                 }
             }
+            ConfirmationState::InMempool
         } else {
-            trace!("tx {} had mempool high, but was not in our mempool", txid);
+            // We don't see it in our mempool.
+            ConfirmationState::Indeterminate
         }
-        ConfirmationState::InMempool
     }
 
     fn add(&mut self, txid: &Txid, tx: Transaction, entry: MempoolEntry) {

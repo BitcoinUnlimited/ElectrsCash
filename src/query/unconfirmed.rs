@@ -2,11 +2,14 @@ use crate::errors::*;
 use crate::mempool::Tracker;
 use crate::query::primitives::{FundingOutput, SpendingInput};
 use crate::query::queryutil::{
-    find_spending_input, txoutrow_to_fundingoutput, txoutrows_by_script_hash,
+    find_spending_input, get_tx_spending_prevout, txoutrow_to_fundingoutput,
+    txoutrows_by_script_hash,
 };
 use crate::query::tx::TxQuery;
 use crate::scripthash::FullHash;
 use crate::timeout::TimeoutTrigger;
+use bitcoincash::blockdata::transaction::OutPoint;
+use bitcoincash::blockdata::transaction::Transaction;
 use bitcoincash::hash_types::Txid;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -99,5 +102,21 @@ impl UnconfirmedQuery {
                 .map(|fee| txn_fees.insert(mempool_txid, fee));
         }
         txn_fees
+    }
+
+    pub fn get_tx_spending_prevout(
+        &self,
+        tracker: &Tracker,
+        timeout: &TimeoutTrigger,
+        prevout: &OutPoint,
+    ) -> Result<
+        Option<(
+            Transaction,
+            u32, /* input index */
+            u32, /* confirmation height */
+        )>,
+    > {
+        // TODO: Check if has unconfirmed parent
+        get_tx_spending_prevout(tracker.index(), &*self.txquery, timeout, prevout)
     }
 }

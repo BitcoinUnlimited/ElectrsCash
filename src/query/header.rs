@@ -52,4 +52,14 @@ impl HeaderQuery {
     pub fn at_height(&self, height: usize) -> Option<HeaderEntry> {
         self.app.index().get_header(height)
     }
+
+    /// Get the height of block where a transaction was confirmed, or None if it's
+    /// not confirmed.
+    /// TODO: Move to TxQuery
+    pub fn get_confirmed_height_for_tx(&self, txid: &Txid) -> Option<u32> {
+        match txrow_by_txid(self.app.read_store(), txid) {
+            Some(txrow) => Some(txrow.height),
+            None => None,
+        }
+    }
 }

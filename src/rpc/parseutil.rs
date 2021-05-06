@@ -24,8 +24,9 @@ pub fn hash_from_value<T: Hash>(val: Option<&Value>) -> Result<T> {
     let hash = val.chain_err(|| rpc_arg_error("missing hash"))?;
     let hash = hash
         .as_str()
-        .chain_err(|| rpc_arg_error("non-string hash"))?;
-    let hash = T::from_hex(hash).chain_err(|| rpc_arg_error("non-hex hash"))?;
+        .chain_err(|| rpc_arg_error("expected hash argument to be a string"))?;
+    let hash = T::from_hex(hash)
+        .chain_err(|| rpc_arg_error("expected hash argument to be a hex string"))?;
     Ok(hash)
 }
 

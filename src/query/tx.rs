@@ -2,6 +2,8 @@ use crate::cache::TransactionCache;
 use crate::daemon::Daemon;
 use crate::def::COIN;
 use crate::errors::*;
+use crate::mempool::ConfirmationState;
+use crate::mempool::Tracker;
 use crate::query::header::HeaderQuery;
 use bitcoincash::blockdata::script::Script;
 use bitcoincash::blockdata::transaction::Transaction;
@@ -13,7 +15,7 @@ use bitcoincash::util::address::Payload::{PubkeyHash, ScriptHash};
 use bitcoincash::util::address::{Address, AddressType};
 use rust_decimal::prelude::*;
 use serde_json::Value;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 ///  String returned is intended to be the same as produced by bitcoind
 ///  GetTxnOutputType
@@ -96,6 +98,7 @@ fn value_from_amount(amount: u64) -> Value {
 pub struct TxQuery {
     tx_cache: TransactionCache,
     daemon: Daemon,
+    mempool: Arc<RwLock<Tracker>>,
     header: Arc<HeaderQuery>,
     duration: Arc<prometheus::HistogramVec>,
     network: Network,
@@ -105,6 +108,7 @@ impl TxQuery {
     pub fn new(
         tx_cache: TransactionCache,
         daemon: Daemon,
+        mempool: Arc<RwLock<Tracker>>,
         header: Arc<HeaderQuery>,
         duration: Arc<prometheus::HistogramVec>,
         network: Network,
@@ -112,12 +116,14 @@ impl TxQuery {
         TxQuery {
             tx_cache,
             daemon,
+            mempool,
             header,
             duration,
             network,
         }
     }
 
+    /// Get a transaction by Txid.
     pub fn get(
         &self,
         txid: &Txid,
@@ -227,5 +233,26 @@ impl TxQuery {
         let tx = deserialize(&serialized_tx).chain_err(|| "failed to parse serialized tx")?;
         self.tx_cache.put(txid, serialized_tx);
         Ok(tx)
+    }
+
+    /// Returns the height the transaction is confirmed at.
+    ///
+    /// If the transaction is in mempool, it return -1 if it has unconfirmed
+    /// parents, or 0 if not.
+    ///
+    /// Returns None if transaction does not exist.
+    pub fn get_confirmation_height(&self, txid: &Txid) -> Option<i64> {
+        {
+            let mempool = self.mempool.read().unwrap();
+            match mempool.tx_confirmation_state(txid, None) {
+                ConfirmationState::InMempool => return Some(0),
+                ConfirmationState::UnconfirmedParent => return Some(-1),
+                _ => (),
+            };
+        }
+        match self.header.get_confirmed_height_for_tx(txid) {
+            Some(height) => Some(height as i64),
+            None => None,
+        }
     }
 }

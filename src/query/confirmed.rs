@@ -1,12 +1,15 @@
 use crate::errors::*;
 use crate::query::primitives::{FundingOutput, SpendingInput};
 use crate::query::queryutil::{
-    find_spending_input, txoutrow_to_fundingoutput, txoutrows_by_script_hash,
+    find_spending_input, get_tx_spending_prevout, txoutrow_to_fundingoutput,
+    txoutrows_by_script_hash,
 };
 use crate::query::tx::TxQuery;
 use crate::scripthash::FullHash;
 use crate::store::ReadStore;
 use crate::timeout::TimeoutTrigger;
+use bitcoincash::blockdata::transaction::OutPoint;
+use bitcoincash::blockdata::transaction::Transaction;
 use rayon::prelude::*;
 use std::sync::Arc;
 
@@ -69,5 +72,20 @@ impl ConfirmedQuery {
         let spending: Vec<SpendingInput> = spending.into_iter().filter_map(|s| s).collect();
         timer.observe_duration();
         Ok(spending)
+    }
+
+    pub fn get_tx_spending_prevout(
+        &self,
+        read_store: &dyn ReadStore,
+        timeout: &TimeoutTrigger,
+        prevout: &OutPoint,
+    ) -> Result<
+        Option<(
+            Transaction,
+            u32, /* input index */
+            u32, /* confirmation height */
+        )>,
+    > {
+        get_tx_spending_prevout(read_store, &*self.txquery, timeout, prevout)
     }
 }
