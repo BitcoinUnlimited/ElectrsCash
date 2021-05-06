@@ -151,6 +151,7 @@ impl Connection {
             "blockchain.transaction.id_from_pos" => {
                 self.blockchainrpc.transaction_id_from_pos(&params)
             }
+            "blockchain.utxo.get" => self.blockchainrpc.utxo_get(&params, &timeout),
             "mempool.get_fee_histogram" => Ok(self.mempool_get_fee_histogram()),
             "server.add_peer" => server_add_peer(),
             "server.banner" => server_banner(&self.query),

@@ -201,7 +201,7 @@ fn create_merkle_branch_and_root<T: Hash>(mut hashes: Vec<T>, mut index: usize) 
 
 pub struct Query {
     app: Arc<App>,
-    tracker: RwLock<Tracker>,
+    tracker: Arc<RwLock<Tracker>>,
     duration: Arc<prometheus::HistogramVec>,
     confirmed: ConfirmedQuery,
     unconfirmed: UnconfirmedQuery,
@@ -224,10 +224,12 @@ impl Query {
             ),
             &["type"],
         ));
+        let tracker = Arc::new(RwLock::new(Tracker::new(metrics)));
         let header = Arc::new(HeaderQuery::new(app.clone()));
         let tx = Arc::new(TxQuery::new(
             tx_cache,
             daemon,
+            tracker.clone(),
             header.clone(),
             duration.clone(),
             network,
@@ -236,7 +238,7 @@ impl Query {
         let unconfirmed = UnconfirmedQuery::new(tx.clone(), duration.clone());
         Ok(Arc::new(Query {
             app,
-            tracker: RwLock::new(Tracker::new(metrics)),
+            tracker,
             duration,
             confirmed,
             unconfirmed,
@@ -562,5 +564,30 @@ impl Query {
 
     pub fn header(&self) -> &HeaderQuery {
         &self.header
+    }
+
+    pub fn get_tx_spending_prevout(
+        &self,
+        prevout: &OutPoint,
+        timeout: &TimeoutTrigger,
+    ) -> Result<
+        Option<(
+            Transaction,
+            u32, /* input index */
+            u32, /* confirmation height */
+        )>,
+    > {
+        {
+            let tracker = self.tracker.read().unwrap();
+            let spent = self
+                .unconfirmed
+                .get_tx_spending_prevout(&tracker, timeout, prevout)?;
+            if spent.is_some() {
+                return Ok(spent);
+            }
+        }
+        let store = self.app.read_store();
+        self.confirmed
+            .get_tx_spending_prevout(store, timeout, prevout)
     }
 }

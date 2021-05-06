@@ -103,7 +103,7 @@ fn confirmation_state(mempool: Option<&Tracker>, txid: &Txid, height: u32) -> Co
         return ConfirmationState::Confirmed;
     }
     let mempool = mempool.unwrap();
-    mempool.tx_confirmation_state(&txid, height)
+    mempool.tx_confirmation_state(&txid, Some(height))
 }
 
 pub fn find_spending_input(
@@ -152,6 +152,47 @@ pub fn find_spending_input(
             }));
         }
         timeout.check()?;
+    }
+    Ok(None)
+}
+
+// TODO: Combine with above method
+pub fn get_tx_spending_prevout(
+    store: &dyn ReadStore,
+    txquery: &TxQuery,
+    timeout: &TimeoutTrigger,
+    prevout: &OutPoint,
+) -> Result<
+    Option<(
+        Transaction,
+        u32, /* input index */
+        u32, /* confirmation height */
+    )>,
+> {
+    for txid_prefix in store
+        .scan(&TxInRow::filter(&prevout))
+        .iter()
+        .map(|row| TxInRow::from_row(row).txid_prefix)
+    {
+        for txrow in store
+            .scan(&TxRow::filter_prefix(txid_prefix))
+            .iter()
+            .map(|row| TxRow::from_row(row))
+        {
+            let tx = txquery.get(&txrow.get_txid(), None, Some(txrow.height))?;
+            for (n, input) in tx.input.iter().enumerate() {
+                if input.previous_output != *prevout {
+                    continue;
+                }
+                let height = if txrow.height == MEMPOOL_HEIGHT {
+                    0
+                } else {
+                    txrow.height
+                };
+                return Ok(Some((tx, n as u32, height)));
+            }
+            timeout.check()?;
+        }
     }
     Ok(None)
 }
