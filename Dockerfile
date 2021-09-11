@@ -1,5 +1,4 @@
-FROM rust:1.44.1-slim-buster
-
+FROM rust:1.55.0-slim-buster
 RUN apt-get update \
   && apt-get install -y --no-install-recommends clang=1:7.* cmake=3.* \
      libsnappy-dev=1.* curl \
