@@ -13,7 +13,7 @@ edition = "2018"
 build = "build.rs"
 
 [package.metadata.configure_me]
-spec = "config_spec.toml"
+spec = "internal/config_specification.toml"
 
 [features]
 default = ["rocksdb/snappy", "rocksdb/lz4", "rocksdb/zstd", "rocksdb/zlib", "rocksdb/bzip2"]
@@ -25,8 +25,7 @@ bincode = "1.0"
 bitcoincash = { version = "0.25", features = ["use-serde"] }
 bytecodec = "0.4.13"
 byteorder = "1"
-configure_me = "0.3.4"
-configure_me_codegen = "0.3.14"
+configure_me = "0.4.0"
 crossbeam-channel = "0.3"
 error-chain = "0.12"
 glob = "0.3"
@@ -45,7 +44,7 @@ serde = "1.0"
 serde_derive = "1.0"
 serde_json = "1.0"
 signal-hook = "0.1"
-stderrlog = "0.4.1"
+stderrlog = "0.5.1"
 sysconf = ">=0.3.4"
 time = "0.1"
 tiny_http = "0.6"
@@ -64,4 +63,4 @@ genawaiter = "0.99.1"
 rayon = "1.5.0"
 
 [build-dependencies]
-configure_me_codegen = "0.3.12"
+configure_me_codegen = "0.4.0"

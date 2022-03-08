@@ -223,26 +223,26 @@ impl Tracker {
 
         let timer = self.stats.start_timer("add");
         let txids_iter = new_txids.difference(&old_txids);
-        for txid in txids_iter {
-            let entry = match daemon.getmempoolentry(txid) {
-                Ok(e) => e,
+        let entries = txids_iter.filter_map(|txid| {
+            match daemon.getmempoolentry(txid) {
+                Ok(entry) => Some((txid, entry)),
                 Err(err) => {
-                    debug!("no mempool entry {}: {}", txid, err);
-                    continue;
+                    debug!("no mempool entry {}: {}", txid, err); // e.g. new block or RBF
+                    None // ignore this transaction for now
                 }
-            };
-            let tx = match txquery.get_unconfirmed(txid) {
-                Ok(tx) => tx,
+            }
+        });
+        for (txid, entry) in entries {
+            match txquery.get_unconfirmed(txid) {
+                Ok(tx) => {
+                    assert_eq!(tx.txid(), *txid);
+                    self.add(txid, tx, entry);
+                    changed_txs.insert(*txid);
+                }
                 Err(err) => {
-                    // e.g. new block or double spend
-                    // keep the mempool until next update()
-                    debug!("failed to get transaction {:?}: {}", txid, err);
-                    let empty: HashSet<Txid> = HashSet::new();
-                    return Ok(empty);
+                    debug!("failed to get transaction {}: {}", txid, err); // e.g. new block or RBF
                 }
-            };
-            self.add(txid, tx, entry);
-            changed_txs.insert(*txid);
+            }
         }
         timer.observe_duration();
 
