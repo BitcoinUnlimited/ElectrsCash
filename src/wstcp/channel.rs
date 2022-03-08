@@ -334,7 +334,7 @@ impl Future for ProxyChannel {
 }
 
 enum Handshake {
-    RecvRequest(RequestDecoder<NoBodyDecoder>),
+    RecvRequest(Box<RequestDecoder<NoBodyDecoder>>),
     ConnectToRealServer(
         Pin<Box<(dyn Future<Output = async_std::io::Result<TcpStream>> + Send + 'static)>>,
         WebSocketKey,
@@ -344,7 +344,7 @@ enum Handshake {
 }
 impl Handshake {
     fn new() -> Self {
-        Handshake::RecvRequest(RequestDecoder::default())
+        Handshake::RecvRequest(Box::new(RequestDecoder::default()))
     }
 
     fn done(&self) -> bool {
@@ -352,7 +352,7 @@ impl Handshake {
     }
 
     fn response_accepted(key: &WebSocketKey) -> Self {
-        let hash = util::calc_accept_hash(&key);
+        let hash = util::calc_accept_hash(key);
 
         unsafe {
             let mut response = Response::new(

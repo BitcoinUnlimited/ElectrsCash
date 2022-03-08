@@ -201,10 +201,7 @@ impl HeaderList {
     }
 
     pub fn tip(&self) -> Option<HeaderEntry> {
-        match self.headers.last() {
-            Some(header) => Some(header.clone()),
-            None => None,
-        }
+        self.headers.last().cloned()
     }
 
     pub fn len(&self) -> usize {

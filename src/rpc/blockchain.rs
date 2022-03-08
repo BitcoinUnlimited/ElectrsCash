@@ -372,7 +372,7 @@ impl BlockchainRpc {
                 bail!(rpc_invalid_params(format!(
                     "out_n {} does not exist on tx {}, the transaction has {} outputs",
                     out_n,
-                    txid.to_string(),
+                    txid,
                     utxo_creation_tx.output.len()
                 )));
             }

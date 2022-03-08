@@ -95,63 +95,63 @@ impl Connection {
         let timeout = TimeoutTrigger::new(Duration::from_secs(self.doslimits.rpc_timeout as u64));
         let result = match method {
             "blockchain.address.get_balance" => {
-                self.blockchainrpc.address_get_balance(&params, &timeout)
+                self.blockchainrpc.address_get_balance(params, &timeout)
             }
-            "blockchain.address.get_first_use" => self.blockchainrpc.address_get_first_use(&params),
+            "blockchain.address.get_first_use" => self.blockchainrpc.address_get_first_use(params),
             "blockchain.address.get_history" => {
-                self.blockchainrpc.address_get_history(&params, &timeout)
+                self.blockchainrpc.address_get_history(params, &timeout)
             }
             "blockchain.address.get_mempool" => {
-                self.blockchainrpc.address_get_mempool(&params, &timeout)
+                self.blockchainrpc.address_get_mempool(params, &timeout)
             }
             "blockchain.address.get_scripthash" => {
-                self.blockchainrpc.address_get_scripthash(&params)
+                self.blockchainrpc.address_get_scripthash(params)
             }
             "blockchain.address.subscribe" => {
-                self.blockchainrpc.address_subscribe(&params, &timeout)
+                self.blockchainrpc.address_subscribe(params, &timeout)
             }
             "blockchain.address.listunspent" => {
-                self.blockchainrpc.address_listunspent(&params, &timeout)
+                self.blockchainrpc.address_listunspent(params, &timeout)
             }
-            "blockchain.address.unsubscribe" => self.blockchainrpc.address_unsubscribe(&params),
-            "blockchain.block.header" => self.blockchainrpc.block_header(&params),
-            "blockchain.block.headers" => self.blockchainrpc.block_headers(&params),
-            "blockchain.estimatefee" => self.blockchainrpc.estimatefee(&params),
+            "blockchain.address.unsubscribe" => self.blockchainrpc.address_unsubscribe(params),
+            "blockchain.block.header" => self.blockchainrpc.block_header(params),
+            "blockchain.block.headers" => self.blockchainrpc.block_headers(params),
+            "blockchain.estimatefee" => self.blockchainrpc.estimatefee(params),
             "blockchain.headers.subscribe" => self.blockchainrpc.headers_subscribe(),
             "blockchain.relayfee" => self.blockchainrpc.relayfee(),
             "blockchain.scripthash.get_balance" => {
-                self.blockchainrpc.scripthash_get_balance(&params, &timeout)
+                self.blockchainrpc.scripthash_get_balance(params, &timeout)
             }
             "blockchain.scripthash.get_first_use" => {
-                self.blockchainrpc.scripthash_get_first_use(&params)
+                self.blockchainrpc.scripthash_get_first_use(params)
             }
             "blockchain.scripthash.get_history" => {
-                self.blockchainrpc.scripthash_get_history(&params, &timeout)
+                self.blockchainrpc.scripthash_get_history(params, &timeout)
             }
             "blockchain.scripthash.get_mempool" => {
-                self.blockchainrpc.scripthash_get_mempool(&params, &timeout)
+                self.blockchainrpc.scripthash_get_mempool(params, &timeout)
             }
             "blockchain.scripthash.listunspent" => {
-                self.blockchainrpc.scripthash_listunspent(&params, &timeout)
+                self.blockchainrpc.scripthash_listunspent(params, &timeout)
             }
             "blockchain.scripthash.subscribe" => {
-                self.blockchainrpc.scripthash_subscribe(&params, &timeout)
+                self.blockchainrpc.scripthash_subscribe(params, &timeout)
             }
             "blockchain.scripthash.unsubscribe" => {
-                self.blockchainrpc.scripthash_unsubscribe(&params)
+                self.blockchainrpc.scripthash_unsubscribe(params)
             }
-            "blockchain.transaction.broadcast" => self.blockchainrpc.transaction_broadcast(&params),
-            "blockchain.transaction.get" => self.blockchainrpc.transaction_get(&params),
+            "blockchain.transaction.broadcast" => self.blockchainrpc.transaction_broadcast(params),
+            "blockchain.transaction.get" => self.blockchainrpc.transaction_get(params),
             "blockchain.transaction.get_confirmed_blockhash" => self
                 .blockchainrpc
-                .transaction_get_confirmed_blockhash(&params),
+                .transaction_get_confirmed_blockhash(params),
             "blockchain.transaction.get_merkle" => {
-                self.blockchainrpc.transaction_get_merkle(&params)
+                self.blockchainrpc.transaction_get_merkle(params)
             }
             "blockchain.transaction.id_from_pos" => {
-                self.blockchainrpc.transaction_id_from_pos(&params)
+                self.blockchainrpc.transaction_id_from_pos(params)
             }
-            "blockchain.utxo.get" => self.blockchainrpc.utxo_get(&params, &timeout),
+            "blockchain.utxo.get" => self.blockchainrpc.utxo_get(params, &timeout),
             "mempool.get_fee_histogram" => Ok(self.mempool_get_fee_histogram()),
             "server.add_peer" => server_add_peer(),
             "server.banner" => server_banner(&self.query),
@@ -159,8 +159,8 @@ impl Connection {
             "server.features" => server_features(&self.query),
             "server.peers.subscribe" => server_peers_subscribe(),
             "server.ping" => Ok(Value::Null),
-            "server.version" => server_version(&params),
-            "cashaccount.query.name" => self.cashaccount_query_name(&params),
+            "server.version" => server_version(params),
+            "cashaccount.query.name" => self.cashaccount_query_name(params),
             &_ => Err(ErrorKind::RpcError(
                 RpcErrorCode::MethodNotFound,
                 format!("unknown method {}", method),
@@ -229,11 +229,9 @@ impl Connection {
                         cmd.get("params").unwrap_or(&empty_params),
                         cmd.get("id"),
                     ) {
-                        (
-                            Some(&Value::String(ref method)),
-                            &Value::Array(ref params),
-                            Some(ref id),
-                        ) => self.handle_command(method, params, id),
+                        (Some(&Value::String(ref method)), &Value::Array(ref params), Some(id)) => {
+                            self.handle_command(method, params, id)
+                        }
                         _ => bail!("invalid command: {}", cmd),
                     };
                     self.send_values(&[reply])?
@@ -423,14 +421,13 @@ impl Rpc {
                 while let Some((stream, addr)) = acceptor.receiver().recv().unwrap() {
                     let global_limits = global_limits.clone();
 
-                    let mut connections;
-                    match global_limits.inc_connection(&addr.ip()) {
+                    let mut connections = match global_limits.inc_connection(&addr.ip()) {
                         Err(e) => {
                             trace!("[{}] dropping peer - {}", addr, e);
                             let _ = stream.shutdown(Shutdown::Both);
                             continue;
                         }
-                        Ok(n) => connections = n,
+                        Ok(n) => n,
                     };
                     // explicitely scope the shadowed variables for the new thread
                     let query = Arc::clone(&query);
@@ -514,7 +511,7 @@ impl Rpc {
             let id: &Txid = &txin.previous_output.txid;
             let n = txin.previous_output.vout as usize;
 
-            let txn = self.query.tx().get(&id, None, None)?;
+            let txn = self.query.tx().get(id, None, None)?;
             scripthashes.extend(get_output_scripthash(&txn, Some(n)));
         }
         Ok(scripthashes)
@@ -543,7 +540,7 @@ impl Rpc {
 
         for header in headers_changed {
             let blockhash = header.hash();
-            let txids = match self.query.getblocktxids(&blockhash) {
+            let txids = match self.query.getblocktxids(blockhash) {
                 Ok(txids) => txids,
                 Err(e) => {
                     warn!("Failed to get blocktxids for {}: {}", blockhash, e);

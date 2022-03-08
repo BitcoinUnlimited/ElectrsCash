@@ -361,7 +361,7 @@ impl Query {
             .index()
             .get_header(height)
             .chain_err(|| format!("missing block #{}", height))?;
-        let txids = self.app.daemon().getblocktxids(&header_entry.hash())?;
+        let txids = self.app.daemon().getblocktxids(header_entry.hash())?;
         let pos = txids
             .iter()
             .position(|txid| txid == tx_hash)
@@ -523,8 +523,7 @@ impl Query {
             let rows = txoutrows_by_script_hash(store, scripthash);
             let mut txs: Vec<TxRow> = rows
                 .iter()
-                .map(|p| txrows_by_prefix(store, p.txid_prefix))
-                .flatten()
+                .flat_map(|p| txrows_by_prefix(store, p.txid_prefix))
                 .collect();
 
             txs.sort_unstable_by(|a, b| a.height.cmp(&b.height));

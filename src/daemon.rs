@@ -59,7 +59,7 @@ fn parse_error_code(err: &Value) -> Option<i64> {
 
 fn check_error_code(reply_obj: &Map<String, Value>, method: &str) -> Result<()> {
     if let Some(err) = reply_obj.get("error") {
-        if let Some(code) = parse_error_code(&err) {
+        if let Some(code) = parse_error_code(err) {
             match code {
                 // RPC_IN_WARMUP -> retry by later reconnection
                 -28 => bail!(ErrorKind::Connection(err.to_string())),
@@ -519,7 +519,7 @@ impl Daemon {
 
     pub fn getblocktxids(&self, blockhash: &BlockHash) -> Result<Vec<Txid>> {
         self.blocktxids_cache
-            .get_or_else(&blockhash, || self.load_blocktxids(blockhash))
+            .get_or_else(blockhash, || self.load_blocktxids(blockhash))
     }
 
     pub fn gettransaction(
@@ -551,7 +551,7 @@ impl Daemon {
         let txids: Value = self.request("getrawmempool", json!([/*verbose=*/ false]))?;
         let mut result = HashSet::new();
         for value in txids.as_array().chain_err(|| "non-array result")? {
-            result.insert(parse_hash(&value).chain_err(|| "invalid txid")?);
+            result.insert(parse_hash(value).chain_err(|| "invalid txid")?);
         }
         Ok(result)
     }
@@ -593,7 +593,7 @@ impl Daemon {
         let null_hash = BlockHash::default();
         for heights in all_heights.chunks(chunk_size) {
             trace!("downloading {} block headers", heights.len());
-            let mut headers = self.getblockheaders(&heights)?;
+            let mut headers = self.getblockheaders(heights)?;
             assert!(headers.len() == heights.len());
             result.append(&mut headers);
         }

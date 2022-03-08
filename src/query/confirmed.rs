@@ -64,12 +64,12 @@ impl ConfirmedQuery {
             .par_iter()
             .map(|funding_output| {
                 timeout.check().and_then(|_| {
-                    find_spending_input(read_store, &funding_output, None, &*self.txquery, timeout)
+                    find_spending_input(read_store, funding_output, None, &*self.txquery, timeout)
                 })
             })
             .collect();
         let spending = spending?;
-        let spending: Vec<SpendingInput> = spending.into_iter().filter_map(|s| s).collect();
+        let spending: Vec<SpendingInput> = spending.into_iter().flatten().collect();
         timer.observe_duration();
         Ok(spending)
     }

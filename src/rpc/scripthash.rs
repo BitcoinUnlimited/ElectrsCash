@@ -19,11 +19,7 @@ fn unspent_to_json(out: &FundingOutput) -> Value {
 
 fn unspent_from_status(status: &Status) -> Value {
     json!(Value::Array(
-        status
-            .unspent()
-            .into_iter()
-            .map(|out| unspent_to_json(out))
-            .collect()
+        status.unspent().into_iter().map(unspent_to_json).collect()
     ))
 }
 
@@ -32,7 +28,7 @@ pub fn get_balance(
     scripthash: &FullHash,
     timeout: &TimeoutTrigger,
 ) -> Result<Value> {
-    let status = query.status(&scripthash, timeout)?;
+    let status = query.status(scripthash, timeout)?;
     Ok(json!({
         "confirmed": status.confirmed_balance(),
         "unconfirmed": status.mempool_balance()
@@ -79,7 +75,7 @@ pub fn get_history(
     scripthash: &FullHash,
     timeout: &TimeoutTrigger,
 ) -> Result<Value> {
-    let status = query.status(&scripthash, timeout)?;
+    let status = query.status(scripthash, timeout)?;
     Ok(json!(Value::Array(
         status
             .history()
@@ -94,7 +90,7 @@ pub fn get_mempool(
     scripthash: &FullHash,
     timeout: &TimeoutTrigger,
 ) -> Result<Value> {
-    let status = query.status_mempool(&scripthash, timeout)?;
+    let status = query.status_mempool(scripthash, timeout)?;
     Ok(json!(Value::Array(
         status
             .history()

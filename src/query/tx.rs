@@ -157,23 +157,14 @@ impl TxQuery {
     }
 
     pub fn get_verbose(&self, txid: &Txid) -> Result<Value> {
-        let header = self.header.get_by_txid(&txid, None).unwrap_or_default();
-        let blocktime = match header {
-            Some(ref header) => Some(header.header().time),
-            None => None,
-        };
-        let height = match header {
-            Some(ref header) => Some(header.height()),
-            None => None,
-        };
+        let header = self.header.get_by_txid(txid, None).unwrap_or_default();
+        let blocktime = header.as_ref().map(|header| header.header().time);
+        let height = header.as_ref().map(|header| header.height());
         let confirmations = match header {
-            Some(ref header) => {
-                if let Some(best) = self.header.best() {
-                    Some(1 + best.height() - header.height())
-                } else {
-                    None
-                }
-            }
+            Some(ref header) => self
+                .header
+                .best()
+                .map(|best| 1 + best.height() - header.height()),
             None => None,
         };
         let (blockhash, blockhash_hex) = if let Some(h) = header {
@@ -250,9 +241,8 @@ impl TxQuery {
                 _ => (),
             };
         }
-        match self.header.get_confirmed_height_for_tx(txid) {
-            Some(height) => Some(height as i64),
-            None => None,
-        }
+        self.header
+            .get_confirmed_height_for_tx(txid)
+            .map(|height| height as i64)
     }
 }

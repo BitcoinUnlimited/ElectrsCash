@@ -126,15 +126,14 @@ impl GlobalLimits {
     /// Decreases connection count.
     pub fn dec_connection(&self, addr: &IpAddr) -> Result<(u32, u32)> {
         let mut prefix_table = self.total_prefixed_connections.lock().unwrap();
-        let prefix_count;
-        match prefix_table.get_mut(&get_prefix(&addr)) {
+        let prefix_count = match prefix_table.get_mut(&get_prefix(addr)) {
             Some(count) => {
                 *count -= 1;
-                prefix_count = *count;
+                *count
             }
             None => {
                 warn!("IP not found in prefix table");
-                prefix_count = 0;
+                0
             }
         };
         let c =

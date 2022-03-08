@@ -72,7 +72,7 @@ impl UnconfirmedQuery {
             timeout.check()?;
             if let Some(spent) = find_spending_input(
                 tracker.index(),
-                &funding_output,
+                funding_output,
                 Some(tracker),
                 &self.txquery,
                 timeout,

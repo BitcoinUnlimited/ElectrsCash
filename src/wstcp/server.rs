@@ -6,7 +6,6 @@ use std::net::SocketAddr;
 /// WebSocket to TCP proxy server.
 #[derive(Debug)]
 pub struct ProxyServer {
-    proxy_addr: SocketAddr,
     real_server_addr: SocketAddr,
     listener: TcpListener,
 }
@@ -19,7 +18,6 @@ impl ProxyServer {
             .await
             .expect("failed to bind websocket server");
         Ok(ProxyServer {
-            proxy_addr,
             real_server_addr,
             listener,
         })
