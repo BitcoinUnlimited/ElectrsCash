@@ -197,14 +197,14 @@ pub fn index_transaction<'a>(
         if input.previous_output.txid == null_hash {
             None
         } else {
-            Some(TxInRow::new(&txid, &input).to_row())
+            Some(TxInRow::new(&txid, input).to_row())
         }
     });
     let outputs = txn
         .output
         .iter()
         .enumerate()
-        .map(move |(i, output)| TxOutRow::new(&txid, &output, i as u64).to_row());
+        .map(move |(i, output)| TxOutRow::new(&txid, output, i as u64).to_row());
 
     let cashaccount_row = match cashaccount {
         Some(cashaccount) => cashaccount.index_cashaccount(txn, height as u32),
@@ -235,7 +235,7 @@ pub fn index_block<'a>(
     block
         .txdata
         .iter()
-        .flat_map(move |txn| index_transaction(&txn, height, Some(cashaccount)))
+        .flat_map(move |txn| index_transaction(txn, height, Some(cashaccount)))
         .chain(std::iter::once(row))
 }
 
@@ -427,7 +427,7 @@ impl Index {
         let fetcher = spawn_thread("fetcher", move || {
             for blockhash in blockhashes.iter() {
                 sender
-                    .send(Some(daemon.getblock(&blockhash)))
+                    .send(Some(daemon.getblock(blockhash)))
                     .expect("failed sending blocks to be indexed");
             }
             sender

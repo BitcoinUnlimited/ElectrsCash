@@ -73,7 +73,7 @@ fn run_server(config: &Config) -> Result<()> {
         let store = bulk::index_blk_files(
             &daemon,
             config.bulk_index_threads,
-            &&*metrics,
+            &*metrics,
             &signal,
             store,
             config.cashaccount_activation_height,
@@ -84,7 +84,7 @@ fn run_server(config: &Config) -> Result<()> {
     }
     .enable_compaction(); // enable auto compactions before starting incremental index updates.
 
-    let app = App::new(store, index, daemon, &config)?;
+    let app = App::new(store, index, daemon, config)?;
     let tx_cache = TransactionCache::new(config.tx_cache_size as u64, &*metrics);
     let query = Query::new(app.clone(), &*metrics, tx_cache, config.network_type)?;
     let relayfee = query.get_relayfee()?;

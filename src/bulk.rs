@@ -249,6 +249,7 @@ pub fn index_blk_files(
     )?;
     let (blobs, reader) = start_reader(blk_files, parser.clone());
     let rows_chan = SyncChannel::new(0);
+    #[allow(clippy::needless_collect)]
     let indexers: Vec<JoinHandle> = (0..index_threads)
         .map(|_| start_indexer(blobs.clone(), parser.clone(), rows_chan.sender()))
         .collect();

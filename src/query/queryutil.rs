@@ -15,7 +15,7 @@ use genawaiter::{sync::gen, yield_};
 
 // TODO: the functions below can be part of ReadStore.
 pub fn txrow_by_txid(store: &dyn ReadStore, txid: &Txid) -> Option<TxRow> {
-    let key = TxRow::filter_full(&txid);
+    let key = TxRow::filter_full(txid);
     let value = store.get(&key)?;
     Some(TxRow::from_row(&Row { key, value }))
 }
@@ -24,7 +24,7 @@ pub fn txrows_by_prefix(store: &dyn ReadStore, txid_prefix: HashPrefix) -> Vec<T
     store
         .scan(&TxRow::filter_prefix(txid_prefix))
         .iter()
-        .map(|row| TxRow::from_row(row))
+        .map(TxRow::from_row)
         .collect()
 }
 
@@ -32,13 +32,13 @@ pub fn txoutrows_by_script_hash(store: &dyn ReadStore, script_hash: &[u8]) -> Ve
     store
         .scan(&TxOutRow::filter(script_hash))
         .iter()
-        .map(|row| TxOutRow::from_row(row))
+        .map(TxOutRow::from_row)
         .collect()
 }
 
 pub fn txids_by_funding_output(store: &dyn ReadStore, prevout: &OutPoint) -> Vec<HashPrefix> {
     store
-        .scan(&TxInRow::filter(&prevout))
+        .scan(&TxInRow::filter(prevout))
         .iter()
         .map(|row| TxInRow::from_row(row).txid_prefix)
         .collect()
@@ -103,7 +103,7 @@ fn confirmation_state(mempool: Option<&Tracker>, txid: &Txid, height: u32) -> Co
         return ConfirmationState::Confirmed;
     }
     let mempool = mempool.unwrap();
-    mempool.tx_confirmation_state(&txid, Some(height))
+    mempool.tx_confirmation_state(txid, Some(height))
 }
 
 pub fn find_spending_input(
@@ -170,14 +170,14 @@ pub fn get_tx_spending_prevout(
     )>,
 > {
     for txid_prefix in store
-        .scan(&TxInRow::filter(&prevout))
+        .scan(&TxInRow::filter(prevout))
         .iter()
         .map(|row| TxInRow::from_row(row).txid_prefix)
     {
         for txrow in store
             .scan(&TxRow::filter_prefix(txid_prefix))
             .iter()
-            .map(|row| TxRow::from_row(row))
+            .map(TxRow::from_row)
         {
             let tx = txquery.get(&txrow.get_txid(), None, Some(txrow.height))?;
             for (n, input) in tx.input.iter().enumerate() {

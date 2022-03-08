@@ -31,7 +31,7 @@ impl HeaderQuery {
                 height
             }
             None => {
-                txrow_by_txid(self.app.read_store(), &txid)
+                txrow_by_txid(self.app.read_store(), txid)
                     .chain_err(|| format!("not indexed tx {}", txid))?
                     .height
             }

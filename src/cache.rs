@@ -96,7 +96,7 @@ impl TransactionCache {
 
     pub fn get(&self, txid: &Txid) -> Option<Transaction> {
         if let Some(serialized_txn) = self.map.read().unwrap().get(txid) {
-            if let Ok(tx) = deserialize(&serialized_txn) {
+            if let Ok(tx) = deserialize(serialized_txn) {
                 return Some(tx);
             } else {
                 trace!("failed to parse a cached tx");

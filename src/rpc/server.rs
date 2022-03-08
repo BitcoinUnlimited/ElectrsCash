@@ -46,7 +46,7 @@ fn versionstr() -> String {
 }
 
 pub fn parse_version(version: &str) -> Result<Version> {
-    let version = Version::from(&version).chain_err(|| rpc_arg_error("invalid version string"))?;
+    let version = Version::from(version).chain_err(|| rpc_arg_error("invalid version string"))?;
     Ok(version)
 }
 
