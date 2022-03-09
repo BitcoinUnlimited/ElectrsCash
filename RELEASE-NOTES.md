@@ -1,5 +1,29 @@
 # Release notes
 
+## 3.1.0 (8 March 2022)
+
+This release contains stability fixes, docker update and a new RPC call
+`blockchain.utxo.get`.
+
+The RPC call gives you data on a existing UTXO, or a UTXO that existed at
+some point. If the output is spent, information about the spender is provided.
+This allows a SPV client to call blockchain.transaction.get\_merkle to generate
+a merkle branch, proving that it is spent.
+
+*This project is moving to GitLab, as voted on in
+[BUIP091](https://github.com/BitcoinUnlimited/BUIP/blob/master/091.md). More
+info on this soon.*
+
+* [bug] Error handling at client connect (#133)
+* [bug] Fix Dockerfile build issues (by SuperCipher, #138)
+* [bug] Ignore individual mempool transaction when fetch fails (#141)
+* [maintainance] Clippy (linter) updates for newer Rust versions (#135, #139)
+* [maintainance] Use tx outpoint struct from `bitcoincash` crate (#136)
+* [misc] Avoid configuration footguns (#141)
+* [misc] Rename `cookie` parameter to `auth` (#141)
+* [rpc] Add RPC `blockchain.utxo.get` (#137)
+* [rpc] Improved error message for invalid parameters (#137)
+
 ## 3.0.0 (21 January 2021)
 
 ### Relase notes
