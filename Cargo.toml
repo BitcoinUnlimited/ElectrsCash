@@ -26,7 +26,7 @@ bitcoincash = { version = "0.25", features = ["use-serde"] }
 bytecodec = "0.4.13"
 byteorder = "1"
 configure_me = "0.4.0"
-crossbeam-channel = "0.3"
+crossbeam-channel = "0.5"
 error-chain = "0.12"
 glob = "0.3"
 hex = "0.3"
