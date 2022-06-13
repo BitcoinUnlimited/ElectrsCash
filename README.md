@@ -1,9 +1,6 @@
 # ElectrsCash - Electrum Server in Rust
 
-
-[![license](https://img.shields.io/github/license/BitcoinUnlimited/ElectrsCash.svg)](https://github.com/BitcoinUnlimited/ElectrsCash/blob/master/LICENSE)
-![CI](https://github.com/BitcoinUnlimited/ElectrsCash/workflows/Rust/badge.svg?branch=master&event=push)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat-square)](http://makeapullrequest.com)
+## This project has been moved [HERE](https://gitlab.com/bitcoinunlimited/rostrum) with the new name Rostrum
 
 An efficient implementation of Electrum Server.
 
